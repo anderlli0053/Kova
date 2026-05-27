@@ -121,17 +121,14 @@ See the [Contributing guide](https://wiki.kova.md/contributing/) for more detail
 
 ## Keybindings
 
-Default shortcuts:
+To customise, edit your keybindings file (created automatically on first launch), or open it from **Settings → Keyboard Shortcuts → Open file**.
 
-| Action | Shortcut |
-|--------|----------|
-| New file | `Ctrl+N` |
-| Open file | `Ctrl+O` |
-| Save | `Ctrl+S` |
-| Save as | `Ctrl+Shift+S` |
-| Focus mode | `Ctrl+Shift+F` |
+| Platform | Path |
+|----------|------|
+| **macOS / Linux** | `~/.kova/keybindings.yaml` |
+| **Windows** | `%USERPROFILE%\.kova\keybindings.yaml` |
 
-To customise, edit `~/.kova/keybindings.yaml` (created automatically on first launch). Open it from **Settings → Keyboard Shortcuts → Open file**. Full reference on the [Keyboard Shortcuts](https://wiki.kova.md/keyboard-shortcuts/) wiki page.
+Full reference on the [Keyboard Shortcuts](https://wiki.kova.md/keyboard-shortcuts/) wiki page.
 
 ## Themes
 
