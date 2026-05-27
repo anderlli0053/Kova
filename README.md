@@ -135,7 +135,7 @@ To customise, edit `~/.kova/keybindings.yaml` (created automatically on first la
 
 ## Themes
 
-**Theme library** — open the Inspector, expand **Theme**, and click **More Themes…** to browse and install community themes from [themes.kova.md](https://themes.kova.md). Each download is verified against a SHA-256 checksum. Installed themes appear in the picker immediately.
+**Theme library** — open the Inspector, expand **Theme**, and click **More Themes…** to browse and install community themes from the [KovaMD/Themes](https://github.com/KovaMD/Themes) repository. Each download is verified against a SHA-256 checksum. Installed themes appear in the picker immediately.
 
 **Custom themes** — place YAML theme files in `~/.kova/themes/`. They appear in the Inspector alongside built-in themes. See the [Themes](https://wiki.kova.md/themes/) wiki page for the full YAML format.
 
