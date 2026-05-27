@@ -125,9 +125,9 @@ To customise, edit your keybindings file (created automatically on first launch)
 
 | Platform | Path |
 |----------|------|
-| **macOS** | `~/Library/Application Support/md.kova.app/keybindings.yaml` |
-| **Linux** | `~/.config/md.kova.app/keybindings.yaml` |
-| **Windows** | `%APPDATA%\md.kova.app\keybindings.yaml` |
+| **macOS** | `~/Library/Application Support/kova/keybindings.yaml` |
+| **Linux** | `~/.config/kova/keybindings.yaml` |
+| **Windows** | `%APPDATA%\kova\keybindings.yaml` |
 
 Custom themes follow the same base path, under a `themes/` subfolder. Full reference on the [Keyboard Shortcuts](https://wiki.kova.md/keyboard-shortcuts/) wiki page.
 

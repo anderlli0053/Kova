@@ -419,7 +419,7 @@ focus_mode: ctrl+shift+f
 #[tauri::command]
 pub fn load_keybindings(app: AppHandle) -> Result<(String, String), String> {
     use tauri::Manager;
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let config_dir = app.path().config_dir().map_err(|e| e.to_string())?.join("kova");
     let path = config_dir.join("keybindings.yaml");
 
     if !path.exists() {
@@ -480,7 +480,7 @@ header:
 #[tauri::command]
 pub fn load_custom_themes(app: AppHandle) -> Result<(String, Vec<(String, String)>), String> {
     use tauri::Manager;
-    let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+    let config_dir = app.path().config_dir().map_err(|e| e.to_string())?.join("kova");
     let themes_dir = config_dir.join("themes");
     let dir_str = themes_dir.to_string_lossy().into_owned();
 
@@ -522,7 +522,7 @@ pub fn save_theme(app: AppHandle, id: String, yaml: String) -> Result<(), String
     if id.is_empty() || !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
         return Err("invalid theme id".into());
     }
-    let themes_dir = app.path().app_config_dir().map_err(|e| e.to_string())?.join("themes");
+    let themes_dir = app.path().config_dir().map_err(|e| e.to_string())?.join("kova").join("themes");
     std::fs::create_dir_all(&themes_dir).map_err(|e| e.to_string())?;
     let path = themes_dir.join(format!("{id}.yaml"));
     std::fs::write(path, yaml).map_err(|e| e.to_string())?;
@@ -536,7 +536,7 @@ pub fn delete_theme(app: AppHandle, id: String) -> Result<(), String> {
     if id.is_empty() || !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
         return Err("invalid theme id".into());
     }
-    let path = app.path().app_config_dir().map_err(|e| e.to_string())?
+    let path = app.path().config_dir().map_err(|e| e.to_string())?.join("kova")
         .join("themes").join(format!("{id}.yaml"));
     if path.exists() {
         std::fs::remove_file(path).map_err(|e| e.to_string())?;
