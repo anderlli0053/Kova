@@ -240,10 +240,10 @@ export default function App() {
     setMissingThemeId(null);
   }, [reloadCustomThemes]);
 
-  // Load custom themes from ~/.kova/themes/ on startup
+  // Load custom themes from the platform config dir on startup
   useEffect(() => { reloadCustomThemes(); }, [reloadCustomThemes]);
 
-  // Load keybindings from ~/.kova/keybindings.yaml on startup
+  // Load keybindings from the platform config dir on startup
   useEffect(() => {
     loadKeybindings().then(setKeybindings).catch(() => {});
   }, []);

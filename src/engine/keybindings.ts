@@ -25,7 +25,7 @@ export interface Keybindings {
   combos: Record<string, string>;
 }
 
-/** Load ~/.kova/keybindings.yaml (created from defaults if absent). */
+/** Load keybindings from the platform config dir (created from defaults if absent). */
 export async function loadKeybindings(): Promise<Keybindings> {
   const [path, content] = await invoke<[string, string]>('load_keybindings');
   return { path, combos: parseKeybindings(content) };
