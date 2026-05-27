@@ -10,6 +10,7 @@ interface Props {
   theme: Theme;
   docTitle?: string;
   aspectRatio?: AspectRatio;
+  laserColor?: string;
   onNavigate: (index: number) => void;
   onExit: () => void;
 }
@@ -19,7 +20,7 @@ const NOTE_H  = 160;  // px — speaker notes panel height
 const SLIDE_W = 960;  // virtual slide width (matches ThumbnailPanel)
 
 export function PresentationOverlay({
-  slides, currentIndex, theme, docTitle, aspectRatio = { w: 16, h: 9 }, onNavigate, onExit,
+  slides, currentIndex, theme, docTitle, aspectRatio = { w: 16, h: 9 }, laserColor = '#ff2020', onNavigate, onExit,
 }: Props) {
   const slide = slides[currentIndex];
   const total = slides.length;
@@ -173,7 +174,12 @@ export function PresentationOverlay({
           {laserActive && laserPos && (
             <div
               className="pres-laser-dot"
-              style={{ left: `${laserPos.x * 100}%`, top: `${laserPos.y * 100}%` }}
+              style={{
+                left: `${laserPos.x * 100}%`,
+                top: `${laserPos.y * 100}%`,
+                background: laserColor,
+                boxShadow: `0 0 6px 2px ${laserColor}b3, 0 0 16px 5px ${laserColor}4d`,
+              }}
             />
           )}
         </div>

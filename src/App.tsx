@@ -102,8 +102,6 @@ export default function App() {
   const [allThemes, setAllThemes]         = useState<Theme[]>(BUILT_IN_THEMES);
   const [activeThemeId, setActiveThemeId] = useState<string>(DEFAULT_THEME.id);
   const [themeOverrides, setThemeOverrides] = useState<Partial<Theme>>({});
-  const [themesDir, setThemesDir]         = useState<string>('');
-  const [themeLoadErrors, setThemeLoadErrors] = useState<string[]>([]);
   const [missingThemeId, setMissingThemeId]   = useState<string | null>(null);
 
   const installedRemoteIds = useMemo(
@@ -156,6 +154,14 @@ export default function App() {
 
   // Body-only view for the editor — frontmatter is managed by the inspector.
   const editorBody = useMemo(() => extractFrontmatter(content).body, [content]);
+
+  // When showFrontmatter is on, the editor receives the full document.
+  // Ref is updated synchronously during render so handleContentChange (called
+  // synchronously from CodeMirror's dispatch inside the [content] effect) always
+  // sees the current value — a useEffect update would be too late.
+  const showFrontmatterRef = useRef(settings.showFrontmatter);
+  showFrontmatterRef.current = settings.showFrontmatter;
+  const editorContent = settings.showFrontmatter ? content : editorBody;
 
   // Rewrite relative image srcs to asset:// URLs so Tauri's WebView can load them.
   // Always runs — absolute paths need convertFileSrc even when no file is open.
@@ -218,17 +224,10 @@ export default function App() {
 
   const reloadCustomThemes = useCallback(() => {
     invoke<[string, Array<[string, string]>]>('load_custom_themes')
-      .then(([dir, entries]) => {
-        setThemesDir(dir);
-        const errors: string[] = [];
+      .then(([, entries]) => {
         const custom = entries
-          .map(([id, yaml]) => {
-            const t = parseThemeYaml(id, yaml);
-            if (!t) errors.push(id);
-            return t;
-          })
+          .map(([id, yaml]) => parseThemeYaml(id, yaml))
           .filter((t): t is Theme => t !== null);
-        setThemeLoadErrors(errors);
         setAllThemes(custom.length > 0 ? [...BUILT_IN_THEMES, ...custom] : BUILT_IN_THEMES);
       })
       .catch(() => {});
@@ -502,6 +501,17 @@ export default function App() {
     });
   }, []);
 
+  const handleAspectRatioCycle = useCallback(() => {
+    setContent((prev) => {
+      const { frontmatter: fm } = extractFrontmatter(prev);
+      const current = fm.aspect_ratio as string | undefined;
+      const next = current === '4:3' ? '16:10' : current === '16:10' ? null : '4:3';
+      const patched = patchFrontmatter(prev, { aspect_ratio: next });
+      if (patched !== prev) setIsDirty(true);
+      return patched;
+    });
+  }, []);
+
   const handleOpenFile = useCallback(() => {
     guardDirty(async () => { try {
       const selected = await open({
@@ -633,10 +643,15 @@ export default function App() {
   }, [slides, frontmatter, activeTheme, filePath]);
 
   const handleContentChange = useCallback((newBody: string) => {
-    setContent((prev) => {
-      const fm = prev.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
-      return (fm ? fm[0] : '') + newBody;
-    });
+    if (showFrontmatterRef.current) {
+      // Editor holds the full document — use it directly.
+      setContent(newBody);
+    } else {
+      setContent((prev) => {
+        const fm = prev.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+        return (fm ? fm[0] : '') + newBody;
+      });
+    }
     setIsDirty(true);
   }, []);
 
@@ -719,7 +734,7 @@ export default function App() {
           theme={activeTheme}
           docTitle={frontmatter.title}
           aspectRatio={aspectRatio}
-
+          laserColor={settings.laserColor}
           onNavigate={setCurrentSlideIndex}
           onExit={handlePresentExit}
         />
@@ -734,6 +749,7 @@ export default function App() {
           showNextSlide={settings.presenterShowNextSlide}
           showTimer={settings.presenterShowTimer}
           notesFontSize={settings.presenterNotesFontSize}
+          laserColor={settings.laserColor}
           onNavigate={setCurrentSlideIndex}
           onExit={handlePresentExit}
         />
@@ -892,7 +908,7 @@ export default function App() {
           <Panel id="editor" defaultSize={72} minSize={20}>
             <EditorPanel
               ref={editorRef}
-              content={editorBody}
+              content={editorContent}
               onChange={handleContentChange}
               onCursorSlide={setCurrentSlideIndex}
               onWarn={handleWarn}
@@ -934,14 +950,13 @@ export default function App() {
         isDirty={isDirty}
         filePath={filePath}
         externalImageCount={externalImageCount}
+        aspectRatioLabel={`${aspectRatio.w}:${aspectRatio.h}`}
+        onAspectRatioCycle={handleAspectRatioCycle}
       />
 
       {showSettings && (
         <SettingsModal
           settings={settings}
-          keybindingsPath={keybindings.path}
-          themesDir={themesDir}
-          themeLoadErrors={themeLoadErrors}
           availableUpdate={availableUpdate}
           onChange={handleSettingsChange}
           onUpdateChecked={setAvailableUpdate}

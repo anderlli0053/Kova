@@ -20,7 +20,7 @@ export function AudienceApp() {
   const [initData, setInitData]         = useState<PresentInitPayload | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [scale, setScale]               = useState(1);
-  const [laserPos, setLaserPos]         = useState<{ x: number; y: number } | null>(null);
+  const [laser, setLaser]               = useState<{ x: number; y: number; color: string } | null>(null);
   const slidesRef = useRef<Slide[]>([]);
   const frameRef  = useRef<HTMLDivElement>(null);
 
@@ -45,8 +45,9 @@ export function AudienceApp() {
         getCurrentWindow().close();
       });
 
-      unlistenLaser = await listen<{ x: number; y: number; active: boolean }>('present:laser', (e) => {
-        setLaserPos(e.payload.active ? { x: e.payload.x, y: e.payload.y } : null);
+      unlistenLaser = await listen<{ x: number; y: number; active: boolean; color: string }>('present:laser', (e) => {
+        const { x, y, active, color } = e.payload;
+        setLaser(active ? { x, y, color: color ?? '#ff2020' } : null);
       });
 
       await emit('present:ready', null);
@@ -135,10 +136,15 @@ export function AudienceApp() {
                   pointerEvents: 'none',
                 }}
               />
-              {laserPos && (
+              {laser && (
                 <div
                   className="pres-laser-dot"
-                  style={{ left: `${laserPos.x * 100}%`, top: `${laserPos.y * 100}%` }}
+                  style={{
+                    left: `${laser.x * 100}%`,
+                    top: `${laser.y * 100}%`,
+                    background: laser.color,
+                    boxShadow: `0 0 6px 2px ${laser.color}b3, 0 0 16px 5px ${laser.color}4d`,
+                  }}
                 />
               )}
             </>

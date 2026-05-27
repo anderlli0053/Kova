@@ -15,6 +15,7 @@ interface Props {
   showNextSlide: boolean;
   showTimer: boolean;
   notesFontSize: NotesFontSize;
+  laserColor?: string;
   onNavigate: (index: number) => void;
   onExit: () => void;
 }
@@ -33,7 +34,7 @@ function formatTime(seconds: number): string {
 
 export function PresenterOverlay({
   slides, currentIndex, theme, docTitle, aspectRatio,
-  showNextSlide, showTimer, notesFontSize, onNavigate, onExit,
+  showNextSlide, showTimer, notesFontSize, laserColor = '#ff2020', onNavigate, onExit,
 }: Props) {
   const slide     = slides[currentIndex];
   const nextSlide = slides[currentIndex + 1] ?? null;
@@ -106,7 +107,7 @@ export function PresenterOverlay({
     const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
     setLaserPos({ x, y });
     if (laserActive) {
-      emitTo('audience', 'present:laser', { x, y, active: true }).catch(() => {});
+      emitTo('audience', 'present:laser', { x, y, active: true, color: laserColor }).catch(() => {});
     }
   }, [laserActive]);
 
@@ -177,7 +178,12 @@ export function PresenterOverlay({
             {laserActive && laserPos && (
               <div
                 className="pres-laser-dot"
-                style={{ left: `${laserPos.x * 100}%`, top: `${laserPos.y * 100}%` }}
+                style={{
+                  left: `${laserPos.x * 100}%`,
+                  top: `${laserPos.y * 100}%`,
+                  background: laserColor,
+                  boxShadow: `0 0 6px 2px ${laserColor}b3, 0 0 16px 5px ${laserColor}4d`,
+                }}
               />
             )}
           </div>

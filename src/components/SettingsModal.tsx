@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import type { AppSettings, PresentationMode, NotesFontSize } from '../store/settings';
-import { EDITOR_FONT_OPTIONS } from '../store/settings';
+import type { AppSettings, PresentationMode, NotesFontSize, LaserColor } from '../store/settings';
+import { EDITOR_FONT_OPTIONS, LASER_COLOR_OPTIONS } from '../store/settings';
 import { isFontAvailable } from '../engine/fontDetect';
 import { fetchUpdate, canSelfUpdate } from '../engine/updater';
 import type { AvailableUpdate } from '../engine/updater';
@@ -134,16 +133,13 @@ type UpdateState =
 
 interface Props {
   settings: AppSettings;
-  keybindingsPath: string;
-  themesDir: string;
-  themeLoadErrors: string[];
   availableUpdate: string | null;
   onChange: (s: AppSettings) => void;
   onUpdateChecked: (tag: string | null) => void;
   onClose: () => void;
 }
 
-export function SettingsModal({ settings, keybindingsPath, themesDir, themeLoadErrors, availableUpdate, onChange, onUpdateChecked, onClose }: Props) {
+export function SettingsModal({ settings, availableUpdate, onChange, onUpdateChecked, onClose }: Props) {
   const set = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     onChange({ ...settings, [key]: value });
 
@@ -335,59 +331,11 @@ export function SettingsModal({ settings, keybindingsPath, themesDir, themeLoadE
           </div>
         </div>
 
-        {/* Themes */}
-        <Section label="Themes" />
-
-        <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-            Drop any <code style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>.yaml</code> theme file into the folder below and restart Kova to load it. Copy <code style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>example.yaml</code> as a starting point.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <code style={{
-              flex: 1,
-              fontSize: 10,
-              fontFamily: 'var(--font-mono)',
-              background: 'var(--bg-app)',
-              border: '1px solid var(--border)',
-              borderRadius: 4,
-              padding: '5px 8px',
-              color: 'var(--text-muted)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {themesDir}
-            </code>
-            <button
-              type="button"
-              onClick={() => invoke('show_in_file_manager', { path: themesDir }).catch(() => {})}
-              style={{
-                flexShrink: 0,
-                padding: '5px 12px',
-                fontSize: 11,
-                borderRadius: 4,
-                border: '1px solid var(--border-alt)',
-                background: 'var(--bg-input)',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-              }}
-            >
-              Open folder
-            </button>
-          </div>
-          {themeLoadErrors.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 11, color: '#c0392b', marginBottom: 4 }}>
-                Failed to load {themeLoadErrors.length} theme file{themeLoadErrors.length > 1 ? 's' : ''}:
-              </div>
-              {themeLoadErrors.map((err) => (
-                <div key={err} style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', paddingLeft: 8 }}>
-                  {err}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <Row
+          label="Show frontmatter YAML in editor"
+          description="Displays the YAML frontmatter block at the top of the editor so it can be edited directly alongside the slides."
+          control={<Toggle checked={settings.showFrontmatter} onChange={(v) => set('showFrontmatter', v)} />}
+        />
 
         {/* Language & Spelling */}
         <Section label="Language &amp; Spelling" />
@@ -551,6 +499,32 @@ export function SettingsModal({ settings, keybindingsPath, themesDir, themeLoadE
           </div>
         </div>
 
+        <Row
+          label="Laser pointer colour"
+          control={
+            <div style={{ display: 'flex', gap: 8 }}>
+              {LASER_COLOR_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  title={label}
+                  onClick={() => set('laserColor', value as LaserColor)}
+                  style={{
+                    width: 22, height: 22, borderRadius: '50%', padding: 0,
+                    background: value,
+                    border: settings.laserColor === value
+                      ? '2px solid var(--accent)'
+                      : '2px solid transparent',
+                    outline: settings.laserColor === value ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    outlineOffset: 2,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                />
+              ))}
+            </div>
+          }
+        />
 
         {settings.presentationMode === 'dual' && (
           <>
@@ -580,49 +554,6 @@ export function SettingsModal({ settings, keybindingsPath, themesDir, themeLoadE
             </div>
           </>
         )}
-
-        {/* Keyboard Shortcuts */}
-        <Section label="Keyboard Shortcuts" />
-
-        <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>Keybindings file</div>
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-            Shortcuts are defined in a YAML file. Edit it in any text editor and restart Kova to apply changes.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <code style={{
-              flex: 1,
-              fontSize: 10,
-              fontFamily: 'var(--font-mono)',
-              background: 'var(--bg-app)',
-              border: '1px solid var(--border)',
-              borderRadius: 4,
-              padding: '5px 8px',
-              color: 'var(--text-muted)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {keybindingsPath}
-            </code>
-            <button
-              type="button"
-              onClick={() => invoke('show_in_file_manager', { path: keybindingsPath }).catch(() => {})}
-              style={{
-                flexShrink: 0,
-                padding: '5px 12px',
-                fontSize: 11,
-                borderRadius: 4,
-                border: '1px solid var(--border-alt)',
-                background: 'var(--bg-input)',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-              }}
-            >
-              Open file
-            </button>
-          </div>
-        </div>
 
         {/* Updates */}
         <Section label="Updates" />
@@ -732,74 +663,6 @@ export function SettingsModal({ settings, keybindingsPath, themesDir, themeLoadE
           )}
         </div>}
 
-        {/* Licenses */}
-        <Section label="Licenses" />
-
-        <div style={{ padding: '10px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Kova is built on open source software.
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowLicenses(v => !v)}
-              style={{
-                flexShrink: 0,
-                marginLeft: 12,
-                padding: '3px 10px',
-                fontSize: 11,
-                borderRadius: 4,
-                border: '1px solid var(--border-alt)',
-                background: 'var(--bg-input)',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-              }}
-            >
-              {showLicenses ? 'Hide' : 'Show'}
-            </button>
-          </div>
-
-          {showLicenses && (
-            <div style={{
-              marginTop: 10,
-              border: '1px solid var(--border)',
-              borderRadius: 4,
-              overflow: 'hidden',
-            }}>
-              {THIRD_PARTY_LICENSES.map((entry, i) => (
-                <div
-                  key={entry.name}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr auto',
-                    alignItems: 'baseline',
-                    gap: '6px 12px',
-                    padding: '7px 10px',
-                    background: i % 2 === 0 ? 'var(--bg-app)' : 'transparent',
-                    borderBottom: i < THIRD_PARTY_LICENSES.length - 1 ? '1px solid var(--border)' : 'none',
-                  }}
-                >
-                  <div>
-                    <span style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{entry.name}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>{entry.copyright}</span>
-                  </div>
-                  <span style={{
-                    fontSize: 10,
-                    color: 'var(--text-secondary)',
-                    background: 'var(--bg-input)',
-                    border: '1px solid var(--border-alt)',
-                    borderRadius: 3,
-                    padding: '1px 6px',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {entry.license}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* About */}
         <Section label="About" />
 
@@ -810,10 +673,67 @@ export function SettingsModal({ settings, keybindingsPath, themesDir, themeLoadE
               Free and open source · GNU General Public License v3
             </div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
-            v{APP_VERSION}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => setShowLicenses(v => !v)}
+              style={{
+                padding: '3px 10px',
+                fontSize: 11,
+                borderRadius: 4,
+                border: '1px solid var(--border-alt)',
+                background: 'var(--bg-input)',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+              }}
+            >
+              {showLicenses ? 'Hide licenses' : 'Licenses'}
+            </button>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
+              v{APP_VERSION}
+            </div>
           </div>
         </div>
+
+        {showLicenses && (
+          <div style={{
+            marginTop: 10,
+            border: '1px solid var(--border)',
+            borderRadius: 4,
+            overflow: 'hidden',
+          }}>
+            {THIRD_PARTY_LICENSES.map((entry, i) => (
+              <div
+                key={entry.name}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  alignItems: 'baseline',
+                  gap: '6px 12px',
+                  padding: '7px 10px',
+                  background: i % 2 === 0 ? 'var(--bg-app)' : 'transparent',
+                  borderBottom: i < THIRD_PARTY_LICENSES.length - 1 ? '1px solid var(--border)' : 'none',
+                }}
+              >
+                <div>
+                  <span style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500 }}>{entry.name}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 8 }}>{entry.copyright}</span>
+                </div>
+                <span style={{
+                  fontSize: 10,
+                  color: 'var(--text-secondary)',
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--border-alt)',
+                  borderRadius: 3,
+                  padding: '1px 6px',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {entry.license}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
       </div>
     </>

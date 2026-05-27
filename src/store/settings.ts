@@ -2,6 +2,15 @@ import { detectOsLanguage } from '../engine/spellcheck/spellChecker';
 
 export type PresentationMode  = 'auto' | 'single' | 'dual' | 'mirror';
 export type NotesFontSize     = 'sm' | 'md' | 'lg';
+
+export const LASER_COLOR_OPTIONS = [
+  { value: '#ff2020', label: 'Red'    },
+  { value: '#ff8800', label: 'Orange' },
+  { value: '#22cc44', label: 'Green'  },
+  { value: '#4488ff', label: 'Blue'   },
+  { value: '#ffffff', label: 'White'  },
+] as const;
+export type LaserColor = typeof LASER_COLOR_OPTIONS[number]['value'];
 export type UiTheme           = 'auto' | 'dark' | 'light';
 export type EditorFont        = 'ibm-plex-mono' | 'jetbrains-mono' | 'fira-code' | 'cascadia-code' | 'source-code-pro' | 'ubuntu-mono' | 'inconsolata' | 'system';
 export type { SpellCheckLanguage } from '../engine/spellcheck/spellChecker';
@@ -32,6 +41,9 @@ export interface AppSettings {
   presenterShowNextSlide: boolean;
   presenterShowTimer: boolean;
   presenterNotesFontSize: NotesFontSize;
+  laserColor: LaserColor;
+  // Editor
+  showFrontmatter: boolean;
 }
 
 const KEY = 'kova:settings';
@@ -50,6 +62,8 @@ function buildDefaults(): AppSettings {
     presenterShowNextSlide: true,
     presenterShowTimer: true,
     presenterNotesFontSize: 'md',
+    laserColor: '#ff2020',
+    showFrontmatter: false,
   };
 }
 
