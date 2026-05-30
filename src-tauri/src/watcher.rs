@@ -6,7 +6,7 @@ pub fn create(app: AppHandle, path: PathBuf) -> notify::Result<RecommendedWatche
     let mut watcher = RecommendedWatcher::new(
         move |res: notify::Result<Event>| {
             if let Ok(event) = res {
-                if matches!(event.kind, EventKind::Modify(_)) {
+                if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
                     let _ = app.emit("file-changed", ());
                 }
             }

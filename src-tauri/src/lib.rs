@@ -2,7 +2,7 @@ mod commands;
 mod file_io;
 mod watcher;
 
-use commands::AppState;
+use commands::{AppState, WatchState};
 use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,8 +16,7 @@ pub fn run() {
 
     builder
         .manage(AppState {
-            current_file: Mutex::new(None),
-            watcher: Mutex::new(None),
+            watch: Mutex::new(WatchState { current_file: None, watcher: None }),
         })
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
@@ -30,12 +29,15 @@ pub fn run() {
             commands::list_system_fonts,
             commands::write_file_bytes,
             commands::copy_image_to_assets,
+            commands::scan_asset_refs,
+            commands::copy_file_with_assets,
             commands::show_in_file_manager,
             commands::setup_audience_window,
             commands::debug_monitors,
             commands::can_self_update,
             commands::save_theme,
             commands::delete_theme,
+            commands::download_and_cache_font,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

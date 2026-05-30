@@ -44,7 +44,8 @@ pub fn show_in_file_manager(path: String) -> Result<(), String> {
     {
         let mut cmd = std::process::Command::new("explorer");
         if is_file {
-            cmd.arg(format!("/select,{}", canonical.display())); // select file in Explorer
+            // Quote the path so Explorer handles spaces in directory/file names correctly.
+            cmd.arg(format!("/select,\"{}\"", canonical.display()));
         } else {
             cmd.arg(&canonical);
         }
@@ -296,9 +297,15 @@ pub fn debug_monitors(app: AppHandle) -> String {
     out
 }
 
+// Consolidating both watcher fields into one Mutex eliminates the TOCTOU window
+// between separate current_file and watcher lock/unlock cycles.
+pub struct WatchState {
+    pub current_file: Option<PathBuf>,
+    pub watcher: Option<notify::RecommendedWatcher>,
+}
+
 pub struct AppState {
-    pub current_file: Mutex<Option<PathBuf>>,
-    pub watcher: Mutex<Option<notify::RecommendedWatcher>>,
+    pub watch: Mutex<WatchState>,
 }
 
 #[tauri::command]
@@ -317,14 +324,17 @@ pub fn start_watching(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<(), String> {
-    let path_buf = PathBuf::from(&path);
+    // Validate and canonicalise before watching — same boundary check applied to
+    // every other file command, preventing watching of arbitrary system files.
+    let path_buf = file_io::safe_read_path(&path)?;
 
-    // Drop previous watcher before creating a new one
-    *state.watcher.lock().unwrap() = None;
-
+    let mut s = state.watch.lock().unwrap_or_else(|e| e.into_inner());
+    // Drop previous watcher atomically before creating a new one.
+    // Both fields are updated inside the same lock, preventing divergence.
+    s.watcher = None;
     let w = watcher::create(app, path_buf.clone()).map_err(|e| e.to_string())?;
-    *state.current_file.lock().unwrap() = Some(path_buf);
-    *state.watcher.lock().unwrap() = Some(w);
+    s.current_file = Some(path_buf);
+    s.watcher = Some(w);
 
     Ok(())
 }
@@ -342,8 +352,9 @@ pub fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn stop_watching(state: State<'_, AppState>) {
-    *state.watcher.lock().unwrap() = None;
-    *state.current_file.lock().unwrap() = None;
+    let mut s = state.watch.lock().unwrap_or_else(|e| e.into_inner());
+    s.watcher = None;
+    s.current_file = None;
 }
 
 /// Copies `src` into `{dest_dir}/assets/`, creating the directory if needed.
@@ -375,6 +386,9 @@ pub fn copy_image_to_assets(src: String, dest_dir: String) -> Result<String, Str
     let mut name = format!("{stem}.{ext}");
     let mut counter = 1u32;
     loop {
+        if counter > 10_000 {
+            return Err("Too many files with the same name in assets/".into());
+        }
         let dest = assets_dir.join(&name);
         if !dest.exists() {
             std::fs::copy(&src_path, &dest)
@@ -384,6 +398,74 @@ pub fn copy_image_to_assets(src: String, dest_dir: String) -> Result<String, Str
         name = format!("{stem}-{counter}.{ext}");
         counter += 1;
     }
+}
+
+/// Scans a markdown file for local `assets/…` references and returns them as
+/// relative paths (e.g. `["assets/foo.png", "assets/bar.jpg"]`).
+#[tauri::command]
+pub fn scan_asset_refs(file_path: String) -> Result<Vec<String>, String> {
+    let content = file_io::read(&file_path)?;
+    let mut refs: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let needle = "assets/";
+    let mut start = 0usize;
+    while let Some(rel) = content[start..].find(needle) {
+        let abs = start + rel;
+        let rest = &content[abs..];
+        let end = rest
+            .find(|c: char| matches!(c, ')' | '"' | '\'' | ' ' | '\t' | '\n' | '\r'))
+            .unwrap_or(rest.len());
+        if end > needle.len() {
+            refs.insert(rest[..end].to_string());
+        }
+        start = abs + 1; // advance past this match to avoid re-scanning
+    }
+    Ok(refs.into_iter().collect())
+}
+
+/// Writes `content` to `dest_path` and, if `asset_refs` is non-empty,
+/// copies those asset files (resolved relative to `src_path`) into an
+/// `assets/` folder next to the destination.
+#[tauri::command]
+pub fn copy_file_with_assets(
+    src_path: String,
+    content: String,
+    dest_path: String,
+    asset_refs: Vec<String>,
+) -> Result<(), String> {
+    let safe_src  = file_io::safe_read_path(&src_path)?;
+    let safe_dest = file_io::safe_write_path(&dest_path)?;
+
+    std::fs::write(&safe_dest, &content)
+        .map_err(|e| format!("Cannot write destination: {e}"))?;
+
+    if asset_refs.is_empty() {
+        return Ok(());
+    }
+
+    let src_dir  = safe_src.parent().ok_or("Invalid source path")?;
+    let dest_dir = safe_dest.parent().ok_or("Invalid dest path")?;
+
+    for asset_ref in &asset_refs {
+        let src_asset  = src_dir.join(asset_ref);
+        let dest_asset = dest_dir.join(asset_ref);
+        // Create any intermediate directories the relative path requires.
+        if let Some(parent) = dest_asset.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Cannot create dir for {asset_ref}: {e}"))?;
+        }
+        let safe_src_asset = file_io::safe_read_path(
+            src_asset.to_str()
+                .ok_or_else(|| format!("Asset path contains non-UTF-8 characters: {src_asset:?}"))?
+        )?;
+        let safe_dest_asset = file_io::safe_write_path(
+            dest_asset.to_str()
+                .ok_or_else(|| format!("Asset dest path contains non-UTF-8 characters: {dest_asset:?}"))?
+        )?;
+        std::fs::copy(&safe_src_asset, &safe_dest_asset)
+            .map_err(|e| format!("Cannot copy {asset_ref}: {e}"))?;
+    }
+
+    Ok(())
 }
 
 /// Decodes base64-encoded data and writes it as binary to the given path.
@@ -544,6 +626,71 @@ pub fn delete_theme(app: AppHandle, id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Downloads a font file from `url`, verifies its SHA-256, and caches it at
+/// `~/.kova/themes/fonts/<sha256>.woff2`.  Idempotent — if the file is already
+/// present the download is skipped and the cached path is returned immediately.
+#[tauri::command]
+pub async fn download_and_cache_font(
+    app: AppHandle,
+    url: String,
+    sha256: String,
+) -> Result<String, String> {
+    use sha2::{Digest, Sha256};
+    use tauri::Manager;
+
+    // URL must be HTTPS to prevent cleartext interception.
+    if !url.starts_with("https://") {
+        return Err("font URL must use HTTPS".into());
+    }
+
+    // sha256 must be exactly 64 lowercase hex chars — used as the filename,
+    // so this also prevents any path-traversal via crafted hash strings.
+    if sha256.len() != 64 || !sha256.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err("sha256 must be a 64-character hex string".into());
+    }
+
+    let fonts_dir = app
+        .path()
+        .config_dir()
+        .map_err(|e| e.to_string())?
+        .join("kova")
+        .join("themes")
+        .join("fonts");
+
+    std::fs::create_dir_all(&fonts_dir).map_err(|e| e.to_string())?;
+
+    let dest = fonts_dir.join(format!("{sha256}.woff2"));
+
+    if dest.exists() {
+        return Ok(dest.to_string_lossy().into_owned());
+    }
+
+    let response = reqwest::get(&url)
+        .await
+        .map_err(|e| format!("download failed: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("download failed: HTTP {}", response.status()));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("download failed: {e}"))?;
+
+    // Verify integrity before writing to disk.
+    let actual = format!("{:x}", Sha256::digest(&bytes));
+    if actual != sha256 {
+        return Err(format!(
+            "integrity check failed — expected {sha256}, got {actual}"
+        ));
+    }
+
+    std::fs::write(&dest, &bytes).map_err(|e| e.to_string())?;
+
+    Ok(dest.to_string_lossy().into_owned())
+}
+
 /// Returns true if the running installation supports in-place updates.
 /// On Linux this requires AppImage — deb/rpm users must update via their package manager.
 #[tauri::command]
@@ -558,10 +705,15 @@ pub fn can_self_update() -> bool {
 
 /// Returns a sorted, deduplicated list of font family names available on the system.
 #[tauri::command]
-pub fn list_system_fonts() -> Vec<String> {
-    #[cfg(not(target_os = "windows"))]
+pub async fn list_system_fonts() -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(collect_system_fonts)
+        .await
+        .unwrap_or_default()
+}
+
+fn collect_system_fonts() -> Vec<String> {
+    #[cfg(target_os = "linux")]
     {
-        // Linux and macOS: use fontconfig
         let output = match std::process::Command::new("fc-list")
             .arg("--format")
             .arg("%{family[0]}\n")
@@ -570,17 +722,44 @@ pub fn list_system_fonts() -> Vec<String> {
             Ok(o) => o,
             Err(_) => return vec![],
         };
+        sort_dedup_fonts(parse_line_output(&output.stdout))
+    }
 
-        let mut fonts: Vec<String> = String::from_utf8_lossy(&output.stdout)
+    #[cfg(target_os = "macos")]
+    {
+        // Prefer fc-list when Homebrew fontconfig is installed.
+        let fc = std::process::Command::new("fc-list")
+            .arg("--format")
+            .arg("%{family[0]}\n")
+            .output()
+            .ok()
+            .filter(|o| o.status.success() && !o.stdout.is_empty());
+
+        if let Some(out) = fc {
+            return sort_dedup_fonts(parse_line_output(&out.stdout));
+        }
+
+        // Fallback: system_profiler is always available on macOS.
+        // Its output contains lines like:
+        //   Family: Helvetica Neue
+        // We extract the value after the "Family: " prefix.
+        let output = match std::process::Command::new("system_profiler")
+            .args(["SPFontsDataType"])
+            .output()
+        {
+            Ok(o) => o,
+            Err(_) => return vec![],
+        };
+        let text = String::from_utf8_lossy(&output.stdout);
+        let families: Vec<String> = text
             .lines()
-            .map(str::trim)
+            .filter_map(|line| {
+                let trimmed = line.trim();
+                trimmed.strip_prefix("Family: ").map(|f| f.trim().to_string())
+            })
             .filter(|s| !s.is_empty())
-            .map(String::from)
             .collect();
-
-        fonts.sort_unstable_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
-        fonts.dedup();
-        fonts
+        sort_dedup_fonts(families)
     }
 
     #[cfg(target_os = "windows")]
@@ -599,16 +778,21 @@ pub fn list_system_fonts() -> Vec<String> {
             Ok(o) => o,
             Err(_) => return vec![],
         };
-
-        let mut fonts: Vec<String> = String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(String::from)
-            .collect();
-
-        fonts.sort_unstable_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
-        fonts.dedup();
-        fonts
+        sort_dedup_fonts(parse_line_output(&output.stdout))
     }
+}
+
+fn parse_line_output(bytes: &[u8]) -> Vec<String> {
+    String::from_utf8_lossy(bytes)
+        .lines()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
+}
+
+fn sort_dedup_fonts(mut fonts: Vec<String>) -> Vec<String> {
+    fonts.sort_unstable_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    fonts.dedup();
+    fonts
 }

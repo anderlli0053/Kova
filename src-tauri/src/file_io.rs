@@ -45,12 +45,30 @@ pub fn read(path: &str) -> Result<String, String> {
 
 pub fn write(path: &str, content: &str) -> Result<(), String> {
     let safe = safe_write_path(path)?;
-    std::fs::write(&safe, content).map_err(|e| format!("Failed to write file: {e}"))
+    atomic_write(&safe, content.as_bytes())
 }
 
 pub fn write_bytes(path: &str, bytes: &[u8]) -> Result<(), String> {
     let safe = safe_write_path(path)?;
-    std::fs::write(&safe, bytes).map_err(|e| format!("Failed to write file: {e}"))
+    atomic_write(&safe, bytes)
+}
+
+// Writes `data` to `dest` via a sibling temp file then an atomic rename.
+// Keeps the temp file in the same directory as `dest` so the rename is
+// guaranteed to be on the same filesystem (required on Windows).
+// On POSIX the rename is atomic; on Windows it is near-atomic (the OS
+// replaces the destination in a single kernel transaction on NTFS).
+fn atomic_write(dest: &std::path::Path, data: &[u8]) -> Result<(), String> {
+    let tmp = dest.with_file_name(format!(
+        "{}.kova-tmp",
+        dest.file_name().unwrap_or_default().to_string_lossy()
+    ));
+    std::fs::write(&tmp, data)
+        .map_err(|e| format!("Failed to write file: {e}"))?;
+    std::fs::rename(&tmp, dest).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("Failed to save file: {e}")
+    })
 }
 
 #[cfg(test)]
