@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
-const REGISTRY_URL = 'https://themes.kova.md/themes.json';
+// Fetch the registry from GitHub, not the CDN, so the SHA-256 hashes come from
+// an independent source — matches the same URL used by ThemeLibraryModal.
+const REGISTRY_URL = 'https://raw.githubusercontent.com/kovamd/themes/main/themes.json';
 const THEME_URL = (id: string) => `https://themes.kova.md/themes/${id}.yaml`;
 
 interface RemoteTheme {

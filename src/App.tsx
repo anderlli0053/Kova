@@ -28,7 +28,8 @@ import { fetchUpdate } from './engine/updater';
 import { exportToPptx } from './engine/export/exportPptx';
 import { exportToPdf } from './engine/export/exportPdf';
 import { SlideRenderer } from './components/preview/SlideRenderer';
-import { BUILT_IN_THEMES, DEFAULT_THEME, parseThemeYaml } from './engine/theme';
+import { BUILT_IN_THEMES, DEFAULT_THEME, parseThemeYaml, sanitiseThemeOverrides } from './engine/theme';
+import { registerBundledFonts, registerCachedFont } from './engine/bundledFonts';
 import type { Slide, Frontmatter, ListItem } from './engine/types';
 import { parseAspectRatio } from './engine/types';
 import type { Theme } from './engine/theme';
@@ -101,6 +102,8 @@ export default function App() {
   const [resolvedUiTheme, setResolvedUiTheme] = useState<'dark' | 'light'>('dark');
   const [exportMenuOpen, setExportMenuOpen]   = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const [saveAsMenuOpen, setSaveAsMenuOpen]   = useState(false);
+  const saveAsMenuRef = useRef<HTMLDivElement>(null);
   const [pdfExportContext, setPdfExportContext] = useState<{ slides: Slide[]; savePath: string } | null>(null);
   const pdfSlideRefs   = useRef<Map<number, HTMLElement>>(new Map());
   const pdfExportResolveRef = useRef<(() => void) | null>(null);
@@ -131,6 +134,30 @@ export default function App() {
     }
     return merged;
   }, [allThemes, activeThemeId, themeOverrides]);
+
+  // Register any bundled fonts declared by the active theme
+  useEffect(() => {
+    if (activeTheme.bundledFonts?.length) {
+      registerBundledFonts(activeTheme.bundledFonts);
+    }
+  }, [activeTheme.bundledFonts]);
+
+  // Download-once, verify, and register any remote fonts declared by the active theme.
+  // Re-runs only on theme identity change since remoteFonts are theme-level, not overrides.
+  useEffect(() => {
+    const fonts = activeTheme.remoteFonts;
+    if (!fonts?.length) return;
+    for (const font of fonts) {
+      invoke<string>('download_and_cache_font', { url: font.url, sha256: font.sha256 })
+        .then((cachedPath) => {
+          registerCachedFont(font.family, cachedPath, font.weight, font.style, font.sha256, convertFileSrc);
+        })
+        .catch((err) => {
+          console.warn(`[kova] remote font "${font.family}" failed: ${err}`);
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThemeId]);
 
   // Persist panel layout across sessions and inspector toggle/hide
   const PANEL_IDS = ['thumb', 'editor', 'inspector'] as const;
@@ -168,6 +195,12 @@ export default function App() {
   // sees the current value — a useEffect update would be too late.
   const showFrontmatterRef = useRef(settings.showFrontmatter);
   showFrontmatterRef.current = settings.showFrontmatter;
+  const contentRef = useRef(content);
+  contentRef.current = content;
+  // Updated in render body (not useEffect) so the file-changed listener always
+  // sees the current dirty state when it fires synchronously after a watcher event.
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
   const editorContent = settings.showFrontmatter ? content : editorBody;
 
   // Rewrite relative image srcs to asset:// URLs so Tauri's WebView can load them.
@@ -266,15 +299,22 @@ export default function App() {
 
   // Window title
   useEffect(() => {
-    const name = frontmatter.title ?? filePath?.split('/').pop() ?? 'Kova';
+    const name = frontmatter.title ?? filePath?.split(/[\\/]/).pop() ?? 'Kova';
     getCurrentWindow().setTitle(isDirty ? `${name} • — Kova` : `${name} — Kova`).catch(() => {});
   }, [filePath, frontmatter.title, isDirty]);
 
-  // File-changed event from Rust watcher → reload
+  // File-changed event from Rust watcher → reload (if no unsaved edits)
   useEffect(() => {
     const unlisten = listen<void>('file-changed', async () => {
       const path = filePathRef.current;
       if (!path) return;
+      // Guard: if the user has unsaved edits, don't silently overwrite them.
+      // Kova's own saves set isDirty=false before the watcher event fires,
+      // so this warning only appears for genuinely external modifications.
+      if (isDirtyRef.current) {
+        setWarnMessage('File changed externally. Save or discard your changes to reload.');
+        return;
+      }
       try {
         const newContent: string = await invoke('read_file', { path });
         setContent(newContent);
@@ -323,11 +363,11 @@ export default function App() {
       setContent(makeStarter());
       setIsDirty(false);
       setCurrentSlideIndex(0);
-      setActiveThemeId(DEFAULT_THEME.id);
+      setActiveThemeId(settings.defaultThemeId);
       setThemeOverrides({});
       setMissingThemeId(null);
     });
-  }, [guardDirty]);
+  }, [guardDirty, settings.defaultThemeId]);
 
   // Prevents double-exit when the audience window is closed externally while
   // handlePresentExit is already in flight.
@@ -363,9 +403,19 @@ export default function App() {
     try {
       [all, currentMon] = await Promise.all([availableMonitors(), currentMonitor()]);
     } catch { /* ignore */ }
-    const external = all.length > 1
-      ? (all.find((m) => m.name !== currentMon?.name) ?? all[all.length - 1])
-      : null;
+    const external = (() => {
+      if (all.length <= 1) return null;
+      if (currentMon) {
+        // Name-based match works on macOS and Windows.
+        return all.find((m) => m.name !== currentMon.name) ?? null;
+      }
+      // Wayland: currentMonitor() returns null because "primary" is an X11 concept.
+      // Heuristic: the secondary monitor is typically to the right or below, so
+      // pick the one whose origin is furthest from (0, 0).
+      return all.reduce((best, m) =>
+        (m.position.x + m.position.y) > (best.position.x + best.position.y) ? m : best
+      );
+    })();
 
     const rawMode = settings.presentationMode;
     const mode: Exclude<typeof rawMode, 'auto'> =
@@ -534,15 +584,10 @@ export default function App() {
           setActiveThemeId(found.id);
           setMissingThemeId(null);
           const overrides = fm.theme_overrides ?? {};
-          setThemeOverrides({
-            ...(overrides.colors ? { colors: overrides.colors as never } : {}),
-            ...(overrides.fonts  ? { fonts:  overrides.fonts  as never } : {}),
-            ...(overrides.logo !== undefined ? { logo: overrides.logo as string | undefined } : {}),
-            ...(overrides.logo_position ? { logo_position: overrides.logo_position as Theme['logo_position'] } : {}),
-            ...(overrides.logo_opacity !== undefined ? { logo_opacity: overrides.logo_opacity as number } : {}),
-            ...(overrides.header ? { header: overrides.header as never } : {}),
-            ...(overrides.footer ? { footer: overrides.footer as never } : {}),
-          });
+          // Sanitise overrides through the same CSS-injection checks applied to
+          // installed theme YAML files, preventing crafted .md files from
+          // injecting raw CSS property values into slide styles.
+          setThemeOverrides(sanitiseThemeOverrides(overrides as Record<string, unknown>));
         } else {
           setMissingThemeId(fm.theme);
           setThemeOverrides({});
@@ -667,6 +712,36 @@ export default function App() {
     });
   }, [slides, filePath]);
 
+  const handleCopyWithAssets = useCallback(async () => {
+    if (!filePath) return;
+    const defaultPath = filePath.replace(/\.(md|markdown)$/i, '') + '-copy.md';
+    const target = await save({
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+      defaultPath,
+    });
+    if (!target) return;
+    const destPath = target.toLowerCase().endsWith('.md') ? target : `${target}.md`;
+    const src = contentRef.current;
+    const seen = new Set<string>();
+    const WEB_URL = /^(https?|data|asset|tauri):\/\//i;
+    for (const m of src.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) {
+      const ref = decodeURIComponent(m[1]);
+      if (!WEB_URL.test(ref)) seen.add(ref);
+    }
+    for (const m of src.matchAll(/<img[^>]+src=["']([^"']+)["']/g)) {
+      const ref = decodeURIComponent(m[1]);
+      if (!WEB_URL.test(ref)) seen.add(ref);
+    }
+    try {
+      await invoke('copy_file_with_assets', {
+        srcPath: filePath,
+        content: src,
+        destPath,
+        assetRefs: Array.from(seen),
+      });
+    } catch (err) { console.error('Copy with assets failed:', err); }
+  }, [filePath]);
+
   const handleContentChange = useCallback((newBody: string) => {
     if (showFrontmatterRef.current) {
       // Editor holds the full document — use it directly.
@@ -762,6 +837,17 @@ export default function App() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [exportMenuOpen]);
 
+  useEffect(() => {
+    if (!saveAsMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (saveAsMenuRef.current && !saveAsMenuRef.current.contains(e.target as Node)) {
+        setSaveAsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [saveAsMenuOpen]);
+
   // After off-screen slides mount and Mermaid has had time to render, capture
   // them as PNGs and compile the PDF.
   useEffect(() => {
@@ -851,7 +937,21 @@ export default function App() {
         <button className="btn" onClick={handleNewFile} title={`New (${formatCombo(getCombo(keybindings.combos, 'newFile'))})`}>New</button>
         <button className="btn" onClick={handleOpenFile} title={`Open (${formatCombo(getCombo(keybindings.combos, 'openFile'))})`}>Open</button>
         <button className="btn" onClick={handleSave} disabled={!filePath || !isDirty} title={`Save (${formatCombo(getCombo(keybindings.combos, 'save'))})`}>Save</button>
-        <button className="btn" onClick={handleSaveAs} disabled={!content} title={`Save As (${formatCombo(getCombo(keybindings.combos, 'saveAs'))})`}>Save As</button>
+        <div className="btn-group" ref={saveAsMenuRef}>
+          <button className="btn" disabled={!content} onClick={() => setSaveAsMenuOpen((o) => !o)}>
+            Save As ▾
+          </button>
+          {saveAsMenuOpen && (
+            <div className="btn-group-menu">
+              <button className="btn-group-menu-item" onClick={() => { setSaveAsMenuOpen(false); handleSaveAs(); }}>
+                Save As…
+              </button>
+              <button className="btn-group-menu-item" disabled={!filePath} onClick={() => { setSaveAsMenuOpen(false); handleCopyWithAssets(); }}>
+                Copy with Assets…
+              </button>
+            </div>
+          )}
+        </div>
         <div className="btn-group" ref={exportMenuRef}>
           <button
             className="btn"
@@ -895,7 +995,7 @@ export default function App() {
               setIsRenaming(true);
             }}
           >
-            {filePath ? filePath.split('/').pop() : 'Untitled.md'}{isDirty ? ' *' : ''}
+            {filePath ? filePath.split(/[\\/]/).pop() : 'Untitled.md'}{isDirty ? ' *' : ''}
           </div>
         )}
         <button
@@ -1042,6 +1142,7 @@ export default function App() {
         <SettingsModal
           settings={settings}
           availableUpdate={availableUpdate}
+          allThemes={allThemes}
           onChange={handleSettingsChange}
           onUpdateChecked={setAvailableUpdate}
           onClose={() => setShowSettings(false)}
@@ -1063,6 +1164,7 @@ export default function App() {
           onDismiss={() => setMissingThemeId(null)}
         />
       )}
+
 
       {warnMessage && (
         <div style={{

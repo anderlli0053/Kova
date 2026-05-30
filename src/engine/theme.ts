@@ -17,6 +17,14 @@ export interface ThemeFonts {
   code: string;
 }
 
+export interface RemoteFont {
+  family: string;
+  url: string;
+  sha256: string;
+  weight: string;    // e.g. "100 900" for variable, "400" or "700" for static
+  style: 'normal' | 'italic';
+}
+
 export interface ThemeHeader {
   show: boolean;
   text: string;
@@ -48,6 +56,10 @@ export interface Theme {
   logo_opacity: number;
   header: ThemeHeader;
   footer: ThemeFooter;
+  /** Font families to load from the app's bundled font assets (OFL fonts). */
+  bundledFonts?: string[];
+  /** Remote fonts to download-once, verify, and cache locally. */
+  remoteFonts?: RemoteFont[];
 }
 
 // ── Built-in themes ───────────────────────────────────────────────────────────
@@ -416,6 +428,41 @@ export function resolveTemplate(
     .replace(/{total}/g, String(vars.totalSlides ?? ''));
 }
 
+/**
+ * Sanitises a raw `theme_overrides` object from frontmatter YAML before it is
+ * applied to component state. Runs the same CSS-injection checks used by
+ * `normaliseTheme` for installed theme files, preventing a crafted .md file
+ * from injecting raw CSS property values into slide styles.
+ */
+export function sanitiseThemeOverrides(raw: Record<string, unknown>): Partial<Theme> {
+  const base = DEFAULT_THEME;
+  const result: Partial<Theme> = {};
+
+  if (raw.colors && typeof raw.colors === 'object') {
+    result.colors = sanitiseColors(raw.colors as Partial<ThemeColors>, base.colors);
+  }
+  if (raw.fonts && typeof raw.fonts === 'object') {
+    result.fonts = sanitiseFonts(raw.fonts as Partial<ThemeFonts>, base.fonts);
+  }
+  // Logo: only https / data:image/ allowed — same rule as normaliseTheme.
+  if (typeof raw.logo === 'string' && /^(https?:|data:image\/)/.test(raw.logo)) {
+    result.logo = raw.logo;
+  }
+  if (raw.logo_position) {
+    result.logo_position = raw.logo_position as Theme['logo_position'];
+  }
+  if (typeof raw.logo_opacity === 'number') {
+    result.logo_opacity = Math.min(1, Math.max(0, raw.logo_opacity));
+  }
+  if (raw.header && typeof raw.header === 'object') {
+    result.header = { ...base.header, ...(raw.header as Partial<ThemeHeader>) };
+  }
+  if (raw.footer && typeof raw.footer === 'object') {
+    result.footer = { ...base.footer, ...(raw.footer as Partial<ThemeFooter>) };
+  }
+  return result;
+}
+
 /** Parse a custom theme from YAML content (uses the same js-yaml already installed). */
 export function parseThemeYaml(id: string, content: string): Theme | null {
   try {
@@ -472,6 +519,30 @@ function normaliseTheme(id: string, raw: Record<string, unknown>): Theme {
   const footer = (raw.footer as Partial<ThemeFooter>) ?? {};
   const rawLogo = raw.logo as string | undefined;
   const logo = rawLogo && /^(https?:|data:image\/)/.test(rawLogo) ? rawLogo : undefined;
+  const bundledFonts = Array.isArray(raw.bundledFonts)
+    ? (raw.bundledFonts as unknown[]).filter((f): f is string => typeof f === 'string')
+    : undefined;
+
+  const remoteFonts = Array.isArray(raw.remoteFonts)
+    ? (raw.remoteFonts as unknown[]).flatMap((f) => {
+        if (typeof f !== 'object' || f === null) return [];
+        const r = f as Record<string, unknown>;
+        const family = typeof r.family === 'string' ? r.family.trim() : '';
+        const url    = typeof r.url    === 'string' ? r.url.trim()    : '';
+        const sha256 = typeof r.sha256 === 'string' ? r.sha256.trim() : '';
+        if (!family || !url.startsWith('https://') || sha256.length !== 64) return [];
+        if (!/^[0-9a-f]{64}$/.test(sha256)) return [];
+        if (/[;{}]/.test(family)) return [];
+        return [{
+          family,
+          url,
+          sha256,
+          weight: typeof r.weight === 'string' ? r.weight : '100 900',
+          style:  r.style === 'italic' ? 'italic' : 'normal',
+        } as RemoteFont];
+      })
+    : undefined;
+
   return {
     id,
     name: (raw.name as string) ?? id,
@@ -483,5 +554,7 @@ function normaliseTheme(id: string, raw: Record<string, unknown>): Theme {
     logo_opacity: typeof raw.logo_opacity === 'number' ? Math.min(1, Math.max(0, raw.logo_opacity)) : 0.85,
     header: { ...base.header, ...header },
     footer: { ...base.footer, ...footer },
+    ...(bundledFonts && bundledFonts.length > 0 ? { bundledFonts } : {}),
+    ...(remoteFonts  && remoteFonts.length  > 0 ? { remoteFonts  } : {}),
   };
 }
