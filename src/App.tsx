@@ -313,12 +313,18 @@ export default function App() {
       // so this warning only appears for genuinely external modifications.
       if (isDirtyRef.current) {
         setWarnMessage('File changed externally. Save or discard your changes to reload.');
+        if (warnTimerRef.current) clearTimeout(warnTimerRef.current);
+        warnTimerRef.current = setTimeout(() => setWarnMessage(null), 6000);
         return;
       }
       try {
         const newContent: string = await invoke('read_file', { path });
         setContent(newContent);
         setIsDirty(false);
+        // Clear any "file changed externally" warning — the reload (triggered by
+        // the user saving, or by a clean external change) resolves the situation.
+        setWarnMessage(null);
+        if (warnTimerRef.current) { clearTimeout(warnTimerRef.current); warnTimerRef.current = null; }
       } catch (err) {
         console.error('Failed to reload file:', err);
       }
