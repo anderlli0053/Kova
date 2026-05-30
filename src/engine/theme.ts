@@ -435,15 +435,43 @@ export function resolveTemplate(
  * from injecting raw CSS property values into slide styles.
  */
 export function sanitiseThemeOverrides(raw: Record<string, unknown>): Partial<Theme> {
-  const base = DEFAULT_THEME;
   const result: Partial<Theme> = {};
 
+  // Colors: iterate only the keys actually present in the override so we never
+  // flood-fill DEFAULT_THEME values for missing keys. sanitiseColors/sanitiseFonts
+  // always return complete objects (designed for normaliseTheme), so we can't use
+  // them here — we validate each present key individually instead.
   if (raw.colors && typeof raw.colors === 'object') {
-    result.colors = sanitiseColors(raw.colors as Partial<ThemeColors>, base.colors);
+    const rawColors = raw.colors as Record<string, unknown>;
+    const sanitised: Partial<ThemeColors> = {};
+    for (const key of Object.keys(rawColors) as (keyof ThemeColors)[]) {
+      const v = rawColors[key as string];
+      if (key === 'chart_colors' && Array.isArray(v)) {
+        sanitised.chart_colors = (v as unknown[]).filter(
+          (x): x is string => typeof x === 'string' && !/[;{}]/.test(x),
+        );
+      } else if (typeof v === 'string' && !/[;{}]/.test(v.trim())) {
+        (sanitised as Record<string, string>)[key as string] = v.trim();
+      }
+      // Invalid values are dropped; the activeTheme memo falls back to the
+      // active theme's own value for any key absent from the partial.
+    }
+    if (Object.keys(sanitised).length > 0) result.colors = sanitised as ThemeColors;
   }
+
+  // Fonts: same key-by-key approach — only pass through keys that are present.
   if (raw.fonts && typeof raw.fonts === 'object') {
-    result.fonts = sanitiseFonts(raw.fonts as Partial<ThemeFonts>, base.fonts);
+    const rawFonts = raw.fonts as Record<string, unknown>;
+    const sanitised: Partial<ThemeFonts> = {};
+    for (const key of ['title', 'body', 'code'] as (keyof ThemeFonts)[]) {
+      const v = rawFonts[key as string];
+      if (typeof v === 'string' && !/[;{}]/.test(v.trim())) {
+        sanitised[key] = v.trim();
+      }
+    }
+    if (Object.keys(sanitised).length > 0) result.fonts = sanitised as ThemeFonts;
   }
+
   // Logo: only https / data:image/ allowed — same rule as normaliseTheme.
   if (typeof raw.logo === 'string' && /^(https?:|data:image\/)/.test(raw.logo)) {
     result.logo = raw.logo;
@@ -454,11 +482,17 @@ export function sanitiseThemeOverrides(raw: Record<string, unknown>): Partial<Th
   if (typeof raw.logo_opacity === 'number') {
     result.logo_opacity = Math.min(1, Math.max(0, raw.logo_opacity));
   }
+
+  // Header/footer: pass the partial through unchanged — the activeTheme memo
+  // merges with the active theme's own header/footer, so pre-merging here with
+  // DEFAULT_THEME would override active-theme values with light-theme defaults.
+  // Cast via `unknown` because Partial<Theme>.header is ThemeHeader, but the memo
+  // spread handles partial objects correctly at runtime.
   if (raw.header && typeof raw.header === 'object') {
-    result.header = { ...base.header, ...(raw.header as Partial<ThemeHeader>) };
+    result.header = raw.header as unknown as ThemeHeader;
   }
   if (raw.footer && typeof raw.footer === 'object') {
-    result.footer = { ...base.footer, ...(raw.footer as Partial<ThemeFooter>) };
+    result.footer = raw.footer as unknown as ThemeFooter;
   }
   return result;
 }
