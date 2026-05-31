@@ -5,7 +5,9 @@ import { invoke } from '@tauri-apps/api/core';
 // independent of the CDN server — a compromised themes.kova.md cannot forge
 // a hash that wasn't committed to the repo by the CI pipeline.
 const REGISTRY_URL = 'https://raw.githubusercontent.com/kovamd/themes/main/themes.json';
-const THEME_URL = (id: string) => `https://themes.kova.md/themes/${id}.yaml`;
+// sha256 prefix as query param ensures a new hash == new URL == guaranteed
+// cache miss, regardless of how aggressively WKWebView caches the response.
+const THEME_URL = (id: string, sha256: string) => `https://themes.kova.md/themes/${id}.yaml?v=${sha256.slice(0, 16)}`;
 
 interface RemoteTheme {
   id: string;
@@ -56,7 +58,7 @@ export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Pr
       if (!theme?.sha256) {
         throw new Error('Cannot install: theme is missing its integrity hash');
       }
-      const res = await fetch(THEME_URL(id), { cache: 'no-store' });
+      const res = await fetch(THEME_URL(id, theme.sha256), { cache: 'no-store' });
       if (!res.ok) throw new Error('Download failed');
       const buffer = await res.arrayBuffer();
       const digest = await crypto.subtle.digest('SHA-256', buffer);
