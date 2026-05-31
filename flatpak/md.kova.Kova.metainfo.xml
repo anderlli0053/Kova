@@ -70,9 +70,9 @@
   </screenshots>
 
   <releases>
-    <release version="0.2.8" date="2026-05-17">
+    <release version="0.3.3" date="2026-05-31">
       <description>
-        <p>Security fixes and stability improvements.</p>
+        <p>Theme system overhaul, PDF export, default theme setting, remote font loading, and stability fixes.</p>
       </description>
     </release>
   </releases>
