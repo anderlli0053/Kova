@@ -124,9 +124,11 @@ export function detectLayout(
 
   if (!allPureText && !hasTable && (logicalCount === 2 || logicalCount === 3)) return 'bsp';
 
-  // ── Grid: 4+ distinct content elements ───────────────────────────────────
+  // ── Grid: 4+ visually diverse elements ───────────────────────────────────
+  // Pure-text slides with many paragraphs look better stacked or two-column,
+  // not in a grid. Mirror the same guard used by bsp above.
 
-  if (logicalCount >= 4) return 'grid';
+  if (!allPureText && logicalCount >= 4) return 'grid';
 
   // ── Overflow guard ────────────────────────────────────────────────────────
   // When pure-text content is dense enough to overflow the slide, split into

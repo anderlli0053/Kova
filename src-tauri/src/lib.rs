@@ -28,6 +28,8 @@ pub fn run() {
             commands::load_custom_themes,
             commands::list_system_fonts,
             commands::write_file_bytes,
+            commands::read_file_b64,
+            commands::write_asset_bytes,
             commands::copy_image_to_assets,
             commands::scan_asset_refs,
             commands::copy_file_with_assets,

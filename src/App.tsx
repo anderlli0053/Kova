@@ -16,6 +16,7 @@ import { PresenterOverlay } from './components/presentation/PresenterOverlay';
 import type { PresentInitPayload } from './AudienceApp';
 import { SettingsModal } from './components/SettingsModal';
 import { ThemeLibraryModal } from './components/inspector/ThemeLibraryModal';
+import { ImportPptxModal } from './components/ImportPptxModal';
 import { MissingThemeBanner } from './components/MissingThemeBanner';
 import { loadSettings, saveSettings, EDITOR_FONT_OPTIONS } from './store/settings';
 import type { AppSettings } from './store/settings';
@@ -90,6 +91,7 @@ export default function App() {
   const [settings, setSettings]           = useState<AppSettings>(loadSettings);
   const [showSettings, setShowSettings]   = useState(false);
   const [showThemeLibrary, setShowThemeMarketplace] = useState(false);
+  const [showImport, setShowImport]       = useState(false);
   const [showInspector, setShowInspector] = useState(true);
   const [presenterMode, setPresenterMode] = useState(false);
   const [confirmCloseAction, setConfirmCloseAction] = useState<(() => void) | null>(null);
@@ -575,6 +577,22 @@ export default function App() {
     });
   }, []);
 
+  const handleImportComplete = useCallback(async (markdown: string, savedPath: string) => {
+    setShowImport(false);
+    await invoke('stop_watching').catch(() => {});
+    const { frontmatter: fm } = extractFrontmatter(markdown);
+    if (typeof fm.theme === 'string') {
+      const found = allThemes.find((t) => t.id === fm.theme);
+      if (found) { setActiveThemeId(found.id); setMissingThemeId(null); setThemeOverrides(sanitiseThemeOverrides(fm.theme_overrides as Record<string, unknown> ?? {})); }
+      else { setMissingThemeId(fm.theme); setThemeOverrides({}); }
+    } else { setActiveThemeId(DEFAULT_THEME.id); setMissingThemeId(null); setThemeOverrides({}); }
+    setFilePath(savedPath);
+    setContent(markdown);
+    setIsDirty(false);
+    setCurrentSlideIndex(0);
+    await invoke('start_watching', { path: savedPath }).catch(console.error);
+  }, [allThemes]);
+
   const handleOpenFile = useCallback(() => {
     guardDirty(async () => { try {
       const selected = await open({
@@ -942,6 +960,7 @@ export default function App() {
         )}
         <button className="btn" onClick={handleNewFile} title={`New (${formatCombo(getCombo(keybindings.combos, 'newFile'))})`}>New</button>
         <button className="btn" onClick={handleOpenFile} title={`Open (${formatCombo(getCombo(keybindings.combos, 'openFile'))})`}>Open</button>
+        <button className="btn" onClick={() => guardDirty(() => setShowImport(true))} title="Import from PowerPoint (.pptx)">Import</button>
         <button className="btn" onClick={handleSave} disabled={!filePath || !isDirty} title={`Save (${formatCombo(getCombo(keybindings.combos, 'save'))})`}>Save</button>
         <div className="btn-group" ref={saveAsMenuRef}>
           <button className="btn" disabled={!content} onClick={() => setSaveAsMenuOpen((o) => !o)}>
@@ -1160,6 +1179,13 @@ export default function App() {
           installedIds={installedRemoteIds}
           onThemesChanged={reloadCustomThemes}
           onClose={() => setShowThemeMarketplace(false)}
+        />
+      )}
+
+      {showImport && (
+        <ImportPptxModal
+          onImported={handleImportComplete}
+          onClose={() => setShowImport(false)}
         />
       )}
 

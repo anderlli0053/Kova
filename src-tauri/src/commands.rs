@@ -478,6 +478,59 @@ pub fn write_file_bytes(path: String, data: String) -> Result<(), String> {
     file_io::write_bytes(&path, &bytes)
 }
 
+/// Reads a binary file and returns its contents as standard base64.
+/// Used by the PPTX import pipeline to hand raw bytes to the TypeScript parser.
+#[tauri::command]
+pub fn read_file_b64(path: String) -> Result<String, String> {
+    use base64::Engine;
+    let safe = file_io::safe_read_path(&path)?;
+    let bytes = std::fs::read(&safe).map_err(|e| e.to_string())?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
+}
+
+/// Writes base64-encoded bytes to `{dest_dir}/assets/{filename}`.
+/// Creates the assets directory if absent. Appends a numeric suffix on name conflicts.
+/// Returns the final filename (e.g. "pptx_slide1_img1.png").
+#[tauri::command]
+pub fn write_asset_bytes(data: String, filename: String, dest_dir: String) -> Result<String, String> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&data)
+        .map_err(|e| format!("Base64 decode error: {e}"))?;
+
+    let canonical_dest = std::fs::canonicalize(&dest_dir)
+        .map_err(|e| format!("Cannot access destination directory: {e}"))?;
+    file_io::check_in_home(&canonical_dest)?;
+
+    let path = std::path::Path::new(&filename);
+    let raw_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
+    let ext      = path.extension().and_then(|s| s.to_str()).unwrap_or("png");
+
+    let stem: String = raw_stem.chars()
+        .map(|c| if c.is_whitespace() || matches!(c, '(' | ')' | '[' | ']' | '"' | '\'') { '_' } else { c })
+        .collect();
+
+    let assets_dir = canonical_dest.join("assets");
+    std::fs::create_dir_all(&assets_dir)
+        .map_err(|e| format!("Cannot create assets dir: {e}"))?;
+
+    let mut name = format!("{stem}.{ext}");
+    let mut counter = 1u32;
+    loop {
+        if counter > 10_000 {
+            return Err("Too many files with the same name in assets/".into());
+        }
+        let dest = assets_dir.join(&name);
+        if !dest.exists() {
+            std::fs::write(&dest, &bytes)
+                .map_err(|e| format!("Cannot write image: {e}"))?;
+            return Ok(name);
+        }
+        name = format!("{stem}-{counter}.{ext}");
+        counter += 1;
+    }
+}
+
 const DEFAULT_KEYBINDINGS: &str = "\
 # Kova — Keyboard Shortcuts
 # ─────────────────────────────────────────────────────────────────────────────
