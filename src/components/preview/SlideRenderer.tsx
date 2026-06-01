@@ -106,6 +106,7 @@ function buildMermaidInit(theme: Theme): string {
   const secondary = mutedSecondary(c.primary);
   const tertiaryBg = c.code_bg;
   const vars = {
+    fontFamily,
     primaryColor:          c.primary,
     primaryTextColor:      c.title_text,
     primaryBorderColor:    c.primary,
