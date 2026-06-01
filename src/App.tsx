@@ -525,6 +525,12 @@ export default function App() {
     await getCurrentWindow().setFullscreen(true).catch(() => {});
   }, [slides, safeSlideIndex, activeTheme, aspectRatio, frontmatter.title, settings.presentationMode]);
 
+  // Prevent display sleep while presenting; release on exit.
+  // Covers all exit paths (normal, error, external window close).
+  useEffect(() => {
+    invoke('set_wake_lock', { active: presentMode || presenterMode }).catch(() => {});
+  }, [presentMode, presenterMode]);
+
   // When the audience window has OS focus (common on Wayland where compositors
   // ignore focus:false), forward its keydown events so arrow-key navigation
   // works in the presenter without requiring a manual click.

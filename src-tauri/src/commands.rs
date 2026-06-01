@@ -3,6 +3,92 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 
+// --- Wake lock (prevent display sleep during presentations) ---
+
+#[cfg(target_os = "macos")]
+static CAFFEINATE: Mutex<Option<std::process::Child>> = Mutex::new(None);
+
+#[cfg(target_os = "linux")]
+static SCREENSAVER_COOKIE: Mutex<Option<u32>> = Mutex::new(None);
+
+#[cfg(target_os = "windows")]
+extern "system" {
+    fn SetThreadExecutionState(esFlags: u32) -> u32;
+}
+
+#[tauri::command]
+#[allow(unused_variables)]
+pub fn set_wake_lock(active: bool) {
+    #[cfg(target_os = "macos")]
+    {
+        let mut guard = CAFFEINATE.lock().unwrap();
+        if active {
+            if guard.is_none() {
+                if let Ok(child) = std::process::Command::new("caffeinate").arg("-d").spawn() {
+                    *guard = Some(child);
+                }
+            }
+        } else if let Some(mut child) = guard.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use gio::prelude::*;
+        let mut cookie_guard = SCREENSAVER_COOKIE.lock().unwrap();
+        if active && cookie_guard.is_none() {
+            if let Ok(conn) = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE) {
+                let args = ("Kova", "Presentation mode").to_variant();
+                if let Ok(result) = conn.call_sync(
+                    Some("org.freedesktop.ScreenSaver"),
+                    "/org/freedesktop/ScreenSaver",
+                    "org.freedesktop.ScreenSaver",
+                    "Inhibit",
+                    Some(&args),
+                    None,
+                    gio::DBusCallFlags::NONE,
+                    -1,
+                    gio::Cancellable::NONE,
+                ) {
+                    if let Some((cookie,)) = result.get::<(u32,)>() {
+                        *cookie_guard = Some(cookie);
+                    }
+                }
+            }
+        } else if !active {
+            if let Some(c) = cookie_guard.take() {
+                if let Ok(conn) = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE) {
+                    let args = (c,).to_variant();
+                    let _ = conn.call_sync(
+                        Some("org.freedesktop.ScreenSaver"),
+                        "/org/freedesktop/ScreenSaver",
+                        "org.freedesktop.ScreenSaver",
+                        "UnInhibit",
+                        Some(&args),
+                        None,
+                        gio::DBusCallFlags::NONE,
+                        -1,
+                        gio::Cancellable::NONE,
+                    );
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    unsafe {
+        const ES_CONTINUOUS: u32 = 0x80000000;
+        const ES_DISPLAY_REQUIRED: u32 = 0x00000002;
+        if active {
+            SetThreadExecutionState(ES_CONTINUOUS | ES_DISPLAY_REQUIRED);
+        } else {
+            SetThreadExecutionState(ES_CONTINUOUS);
+        }
+    }
+}
+
 /// Opens a path in the native file manager (Finder / Nautilus / Explorer).
 /// Uses platform process commands directly rather than tauri-plugin-opener,
 /// which requires path scopes to be configured before it works on macOS.

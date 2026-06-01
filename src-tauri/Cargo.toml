@@ -34,4 +34,5 @@ sha2 = "0.10"
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = { version = "0.18", features = [] }
 gdk = { version = "0.18", features = [] }
+gio = "0.18"
 
