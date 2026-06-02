@@ -4,7 +4,7 @@ import type { AppSettings, PresentationMode, NotesFontSize, LaserColor } from '.
 import { EDITOR_FONT_OPTIONS, LASER_COLOR_OPTIONS } from '../store/settings';
 import type { Theme } from '../engine/theme';
 import { isFontAvailable } from '../engine/fontDetect';
-import { fetchUpdate, canSelfUpdate } from '../engine/updater';
+import { fetchUpdate, canSelfUpdate, restartApp } from '../engine/updater';
 import type { AvailableUpdate } from '../engine/updater';
 import { APP_VERSION } from '../version';
 import {
@@ -137,12 +137,13 @@ interface Props {
   settings: AppSettings;
   availableUpdate: string | null;
   allThemes: Theme[];
+  isDirty: boolean;
   onChange: (s: AppSettings) => void;
   onUpdateChecked: (tag: string | null) => void;
   onClose: () => void;
 }
 
-export function SettingsModal({ settings, availableUpdate, allThemes, onChange, onUpdateChecked, onClose }: Props) {
+export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, onChange, onUpdateChecked, onClose }: Props) {
   const set = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     onChange({ ...settings, [key]: value });
 
@@ -702,9 +703,30 @@ export function SettingsModal({ settings, availableUpdate, allThemes, onChange, 
           )}
 
           {typeof updateState === 'object' && updateState.phase === 'done' && (
-            <span style={{ fontSize: 11, color: 'var(--accent)' }}>
-              {updateState.version} installed — restart Kova to apply
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 11, color: 'var(--accent)' }}>
+                {updateState.version} installed
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (isDirty && !window.confirm('You have unsaved changes. Restart anyway?')) return;
+                  restartApp();
+                }}
+                style={{
+                  padding: '3px 10px',
+                  fontSize: 11,
+                  borderRadius: 4,
+                  border: '1px solid var(--accent)',
+                  background: 'transparent',
+                  color: 'var(--accent)',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Restart now
+              </button>
+            </div>
           )}
         </div>}
 

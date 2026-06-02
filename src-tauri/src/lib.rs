@@ -7,14 +7,10 @@ use std::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri::Builder::default()
+    tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_dialog::init());
-
-    #[cfg(not(feature = "flatpak"))]
-    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
-
-    builder
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState {
             watch: Mutex::new(WatchState { current_file: None, watcher: None }),
         })
@@ -37,6 +33,7 @@ pub fn run() {
             commands::setup_audience_window,
             commands::debug_monitors,
             commands::can_self_update,
+            commands::restart_app,
             commands::save_theme,
             commands::delete_theme,
             commands::download_and_cache_font,

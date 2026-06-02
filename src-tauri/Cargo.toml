@@ -12,7 +12,6 @@ name = "kova_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
-flatpak = []
 custom-protocol = ["tauri/custom-protocol"]
 
 [build-dependencies]

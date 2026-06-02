@@ -51,3 +51,7 @@ export async function canSelfUpdate(): Promise<boolean> {
   return invoke<boolean>('can_self_update');
 }
 
+export async function restartApp(): Promise<void> {
+  return invoke('restart_app');
+}
+

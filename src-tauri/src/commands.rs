@@ -866,6 +866,11 @@ pub fn can_self_update() -> bool {
     }
 }
 
+#[tauri::command]
+pub fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 
 /// Returns a sorted, deduplicated list of font family names available on the system.
 #[tauri::command]

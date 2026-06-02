@@ -12,9 +12,10 @@ interface Props {
   externalImageCount: number;
   aspectRatioLabel: string;
   onAspectRatioCycle: () => void;
+  availableUpdate?: string | null;
 }
 
-export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, filePath, externalImageCount, aspectRatioLabel, onAspectRatioCycle }: Props) {
+export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, filePath, externalImageCount, aspectRatioLabel, onAspectRatioCycle, availableUpdate }: Props) {
   const minutes = Math.ceil(wordCount / WPM);
   const timeStr = minutes < 2 ? `${minutes} min` : `${minutes} mins`;
   const nextAr = AR_CYCLE[(AR_CYCLE.indexOf(aspectRatioLabel) + 1) % AR_CYCLE.length];
@@ -80,7 +81,23 @@ export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, fileP
           <Divider />
         </>
       )}
-      <Cell>kova v{APP_VERSION}</Cell>
+      <Cell
+        title={availableUpdate ? `Update ${availableUpdate} available` : undefined}
+        style={availableUpdate ? { display: 'flex', alignItems: 'center', gap: 4 } : undefined}
+      >
+        kova v{APP_VERSION}
+        {availableUpdate && (
+          <svg
+            width="11" height="11" viewBox="0 0 24 24"
+            fill="none" stroke="#D94F00" strokeWidth="2.4"
+            strokeLinecap="round" strokeLinejoin="round"
+            style={{ flexShrink: 0 }}
+          >
+            <line x1="12" y1="19" x2="12" y2="5"/>
+            <polyline points="5 12 12 5 19 12"/>
+          </svg>
+        )}
+      </Cell>
     </div>
   );
 }

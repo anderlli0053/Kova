@@ -265,8 +265,31 @@ html, body, #root {
   box-sizing: border-box;
 }
 
-.btn-group-menu-item:hover {
+.btn-group-menu-item:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+.btn-group-menu-item:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.btn-group-menu-item--shortcut {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.btn-group-menu-item--shortcut span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.btn-group-menu-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 0;
 }
 
 /* ── Panel area ── */
