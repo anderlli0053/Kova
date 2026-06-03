@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useLayoutEffect, useId, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import mermaid from 'mermaid';
 import QRCode from 'react-qr-code';
 import { openUrl } from '@tauri-apps/plugin-opener';
@@ -253,6 +255,7 @@ function SlideLayout({ slide }: { slide: Slide }) {
     case 'grid':          return <GridLayout slide={slide} />;
     case 'media':         return <MediaLayout slide={slide} />;
     case 'code':          return <CodeLayout slide={slide} />;
+    case 'math':          return <MathLayout slide={slide} />;
     default:              return <TitleContentLayout slide={slide} />;
   }
 }
@@ -518,6 +521,20 @@ function CodeLayout({ slide }: { slide: Slide }) {
   );
 }
 
+function MathLayout({ slide }: { slide: Slide }) {
+  const mathEls = slide.elements.filter((e): e is Extract<SlideElement, { type: 'math' }> => e.type === 'math');
+  return (
+    <div className="sl-math-layout">
+      {slide.title && <div className="sl-heading sl-math-layout__title">{slide.title}</div>}
+      <div className="sl-math-layout__body">
+        {mathEls.map((el, i) => (
+          <MathBlock key={i} value={el.value} display={el.display} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Progress grouping helper ──────────────────────────────────────────────────
 
 /**
@@ -610,6 +627,9 @@ function ElementNode({ el }: { el: SlideElement }) {
 
     case 'mermaid':
       return <MermaidDiagram value={el.value} />;
+
+    case 'math':
+      return <MathBlock value={el.value} display={el.display} />;
 
     default:
       return null;
@@ -732,6 +752,25 @@ function ProgressBar({ el }: { el: Extract<SlideElement, { type: 'progress' }> }
         <div className="sl-progress__fill" style={{ width: `${pct}%` }} />
       </div>
     </div>
+  );
+}
+
+// ── Math block ────────────────────────────────────────────────────────────────
+
+function MathBlock({ value, display }: { value: string; display: boolean }) {
+  const html = useMemo(() => {
+    try {
+      return katex.renderToString(value, { displayMode: display, throwOnError: false });
+    } catch {
+      return `<code>${value}</code>`;
+    }
+  }, [value, display]);
+
+  return (
+    <div
+      className={`sl-math${display ? ' sl-math--display' : ''}`}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 

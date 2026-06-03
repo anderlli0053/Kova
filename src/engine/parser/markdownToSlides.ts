@@ -1,6 +1,8 @@
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import katex from 'katex';
 import { toString } from 'mdast-util-to-string';
 import type { Root, Node, Paragraph, List, ListItem as MdastListItem, Code, Blockquote, Table, Heading } from 'mdast';
 
@@ -9,7 +11,7 @@ import { detectLayout } from '../layout/autoLayout';
 import { extractFrontmatter } from './frontmatter';
 import { extractSpeakerNotes } from './speakerNotes';
 
-const processor = unified().use(remarkParse).use(remarkGfm);
+const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
 export function parseDocument(rawContent: string): ParsedDocument {
   const normalised = rawContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -49,9 +51,12 @@ interface PreprocessResult {
   placeholders: Map<number, SlideElement>;
 }
 
-const YOUTUBE_RE  = /^!youtube\[([^\]]*)\]\(([^)]*)\)$/;
-const POLL_RE     = /^!poll\[([^\]]*)\]\(([^)]*)\)$/;
-const PROGRESS_RE = /^!progress\[([^\]]*)\]\((\d+(?:\.\d+)?)\)$/;
+const YOUTUBE_RE      = /^!youtube\[([^\]]*)\]\(([^)]*)\)$/;
+const POLL_RE         = /^!poll\[([^\]]*)\]\(([^)]*)\)$/;
+const PROGRESS_RE     = /^!progress\[([^\]]*)\]\((\d+(?:\.\d+)?)\)$/;
+// remark-math v6 only recognises block math when $$ appears on its own line.
+// Normalise single-line $$...$$ → multi-line so it is parsed as a math block.
+const DISPLAY_MATH_RE = /^\$\$(.+)\$\$\s*$/;
 
 function preprocess(content: string): PreprocessResult {
   const placeholders = new Map<number, SlideElement>();
@@ -92,6 +97,13 @@ function preprocess(content: string): PreprocessResult {
 
     // Strip layout override comments (already captured above)
     if (/^<!--\s*layout:/.test(t)) continue;
+
+    // Expand single-line $$...$$ to multi-line so remark-math treats it as a block
+    const dm = t.match(DISPLAY_MATH_RE);
+    if (dm) {
+      cleanLines.push(`$$\n${dm[1]}\n$$`);
+      continue;
+    }
 
     cleanLines.push(line);
   }
@@ -152,6 +164,12 @@ function convertRoot(tree: Root, placeholders: Map<number, SlideElement>): Conve
         } else {
           elements.push({ type: 'code', lang: c.lang ?? '', value: c.value });
         }
+        break;
+      }
+
+      case 'math': {
+        const m = node as { type: 'math'; value: string };
+        elements.push({ type: 'math', value: m.value, display: true });
         break;
       }
 
@@ -274,6 +292,13 @@ function inlineToHtml(children: Node[]): string {
       case 'link':        return `<a href="${escUrl(node.url as string)}">${inlineToHtml(node.children)}</a>`;
       case 'image':       return `<img src="${escUrl(node.url as string)}" alt="${escHtml(node.alt ?? '')}" />`;
       case 'break':       return '<br>';
+      case 'inlineMath': {
+        try {
+          return katex.renderToString(node.value as string, { displayMode: false, throwOnError: false });
+        } catch {
+          return `<code>${escHtml(node.value as string)}</code>`;
+        }
+      }
       default:            return node.children ? inlineToHtml(node.children) : '';
     }
   }).join('');

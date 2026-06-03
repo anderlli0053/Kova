@@ -83,6 +83,10 @@ export function detectLayout(
     return 'code';
   }
 
+  if (bodyElements.length > 0 && bodyElements.every((e) => e.type === 'math')) {
+    return 'math';
+  }
+
   // ── No-title layouts ──────────────────────────────────────────────────────
 
   if (!hasTitle) {

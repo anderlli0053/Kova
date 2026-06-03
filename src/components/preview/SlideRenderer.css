@@ -451,6 +451,49 @@
   fill: transparent !important;
 }
 
+/* ── Math ────────────────────────────────────────────────────────────────── */
+
+.sl-math {
+  width: 100%;
+  color: var(--sl-text);
+  font-size: clamp(10px, 2.4cqi, 22px);
+}
+.sl-math--display {
+  display: flex;
+  justify-content: center;
+  padding: 0.5em 0;
+  overflow-x: auto;
+}
+/* KaTeX uses its own font sizing; let it scale with the slide */
+.sl-math .katex { font-size: 1em; }
+.sl-math .katex-display { margin: 0; }
+
+/* ── Math layout (math-only slides) ─────────────────────────────────────── */
+
+.sl-math-layout {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--sl-bg);
+}
+.sl-math-layout__title {
+  flex-shrink: 0;
+}
+.sl-math-layout__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2cqi 4cqi;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* Scale KaTeX up significantly in the math layout */
+.sl-math-layout .sl-math { font-size: clamp(14px, 4.5cqi, 56px); width: 100%; }
+.sl-math-layout .sl-math .katex-display { overflow-x: auto; overflow-y: hidden; }
+
 /* ── Code layout ─────────────────────────────────────────────────────────── */
 
 .sl-code { height: 100%; display: flex; flex-direction: column; background: var(--sl-bg); }

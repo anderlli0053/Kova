@@ -10,7 +10,8 @@ export type LayoutType =
   | 'bsp'
   | 'grid'
   | 'media'
-  | 'code';
+  | 'code'
+  | 'math';
 
 export interface ListItem {
   text: string;
@@ -24,6 +25,7 @@ export type SlideElement =
   | { type: 'image'; src: string; alt: string; title?: string }
   | { type: 'code'; lang: string; value: string }
   | { type: 'mermaid'; value: string }
+  | { type: 'math'; value: string; display: boolean }
   | { type: 'blockquote'; text: string; attribution?: string }
   | { type: 'table'; headers: string[]; rows: string[][] }
   | { type: 'youtube';  label: string; url: string }

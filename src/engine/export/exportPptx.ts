@@ -262,6 +262,7 @@ function addSlide(
     case 'grid':          addGridSlide(s, slide, t, cy, ch, warnings); break;
     case 'media':         addMediaSlide(s, slide, t, cy, ch); break;
     case 'code':          addCodeSlide(s, slide, t, cy, ch, warnings); break;
+    case 'math':          addTitleContentSlide(s, slide, t, cy, ch, warnings); break;
     default:              addTitleContentSlide(s, slide, t, cy, ch, warnings);
   }
 
@@ -1010,6 +1011,10 @@ function addElements(s: PS, elements: SlideElement[], t: Theme, area: Area, warn
         // Code mixed with other elements: fall back to plain monospaced text.
         // (Single-element code is caught above and rendered with full styling.)
         runs.push({ text: el.value, options: { fontFace: firstFont(t.fonts.code), fontSize: 13, breakLine: true } });
+        break;
+
+      case 'math':
+        runs.push({ text: el.value, options: { fontFace: firstFont(t.fonts.code), fontSize: 15, breakLine: true } });
         break;
 
       // Images and tables handled separately below
