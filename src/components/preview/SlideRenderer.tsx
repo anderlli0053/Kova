@@ -264,6 +264,7 @@ function SlideLayout({ slide }: { slide: Slide }) {
 
 function TitleLayout({ slide }: { slide: Slide }) {
   const subtitles = slide.elements.filter((e): e is Extract<SlideElement, { type: 'paragraph' }> => e.type === 'paragraph');
+  const rest = slide.elements.filter((e) => e.type !== 'paragraph');
   return (
     <div className="sl-title">
       <div className="sl-title__text">{slide.title}</div>
@@ -272,6 +273,11 @@ function TitleLayout({ slide }: { slide: Slide }) {
           {subtitles.map((el, i) => (
             <p key={i} className="sl-title__subtitle" dangerouslySetInnerHTML={{ __html: el.html }} />
           ))}
+        </div>
+      )}
+      {rest.length > 0 && (
+        <div className="sl-title__body">
+          <Elements elements={rest} />
         </div>
       )}
     </div>
@@ -372,13 +378,20 @@ function QuoteLayout({ slide }: { slide: Slide }) {
 }
 
 function autoSplitElements(elements: SlideElement[]): [SlideElement[], SlideElement[]] {
-  // Single list: split its items evenly between the two columns
+  // Single list: split by cumulative text length for visual balance
   if (elements.length === 1 && elements[0].type === 'list') {
     const list = elements[0];
-    const mid = Math.ceil(list.items.length / 2);
+    const items = list.items;
+    const totalLen = items.reduce((n, it) => n + it.text.length, 0);
+    let cumLen = 0;
+    let mid = Math.ceil(items.length / 2); // fallback for empty/equal items
+    for (let i = 0; i < items.length; i++) {
+      cumLen += items[i].text.length;
+      if (cumLen >= totalLen / 2) { mid = i + 1; break; }
+    }
     return [
-      [{ ...list, items: list.items.slice(0, mid) }],
-      [{ ...list, items: list.items.slice(mid) }],
+      [{ ...list, items: items.slice(0, mid) }],
+      [{ ...list, items: items.slice(mid) }],
     ];
   }
   // Multiple elements: split at midpoint
@@ -449,13 +462,14 @@ function BspLayout({ slide }: { slide: Slide }) {
         <div className="sl-bsp__pane">
           <Elements elements={leftGroup} />
         </div>
+        <div className="sl-bsp__divider" />
         {rightGroups.length === 1 ? (
           <div className="sl-bsp__pane">
             <Elements elements={rightGroups[0]} />
           </div>
         ) : (
           <div className="sl-bsp__right">
-            {rightGroups.slice(0, 2).map((g, i) => (
+            {rightGroups.map((g, i) => (
               <div key={i} className="sl-bsp__subpane">
                 <Elements elements={g} />
               </div>

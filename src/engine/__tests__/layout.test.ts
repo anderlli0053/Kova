@@ -139,6 +139,10 @@ describe('image layouts', () => {
     expect(detectLayout([img, code], 2, true)).toBe('bsp');
   });
 
+  it('title + image + blockquote → split (blockquote counts as pure text)', () => {
+    expect(detectLayout([img, bq], 2, true)).toBe('split');
+  });
+
   it('title + two images → bsp', () => {
     expect(detectLayout([img, img], 2, true)).toBe('bsp');
   });
@@ -226,8 +230,12 @@ describe('overflow guard', () => {
     expect(detectLayout([makeList(5)], 2, true)).toBe('title-content');
   });
 
-  it('long list (9 items) triggers two-column', () => {
-    expect(detectLayout([makeList(9)], 2, true)).toBe('two-column');
+  it('9-item list stays title-content with updated threshold', () => {
+    expect(detectLayout([makeList(9)], 2, true)).toBe('title-content');
+  });
+
+  it('long list (12 items) triggers two-column', () => {
+    expect(detectLayout([makeList(12)], 2, true)).toBe('two-column');
   });
 
   it('long list (15 items) triggers two-column', () => {

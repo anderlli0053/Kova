@@ -3,8 +3,9 @@ import type { SlideElement, LayoutType, ListItem } from '../types';
 // ── Content density helpers ───────────────────────────────────────────────────
 
 // Two-column layout kicks in when estimated visual lines exceed this.
-// Column width is ~half the slide, so ~45 chars per line fits comfortably.
-const OVERFLOW_LINE_THRESHOLD = 6;
+// At 18px/1.65 line-height a 540px body area holds ~13 lines; 10 leaves
+// a comfortable margin and accounts for the heading consuming ~112px.
+const OVERFLOW_LINE_THRESHOLD = 10;
 
 /**
  * Counts logical elements, treating consecutive `progress` bars as a single
@@ -25,7 +26,8 @@ function logicalElementCount(elements: SlideElement[]): number {
 }
 
 function estimateItemLines(item: ListItem): number {
-  const self = Math.max(1, Math.ceil(item.text.length / 45));
+  // ~70 chars/line: proportional body font at 18px across a half-slide column
+  const self = Math.max(1, Math.ceil(item.text.length / 70));
   const children = item.children.reduce((n, c) => n + estimateItemLines(c), 0);
   return self + children;
 }
@@ -38,8 +40,9 @@ function estimateLines(elements: SlideElement[]): number {
         total += el.items.reduce((n, item) => n + estimateItemLines(item), 0);
         break;
       case 'paragraph': {
+        // ~90 chars/line: proportional body font at 18px across ~826px usable width
         const lines = el.text.split('\n').filter(Boolean);
-        total += lines.reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 55)), 0);
+        total += lines.reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 90)), 0);
         break;
       }
       case 'progress':
@@ -110,7 +113,7 @@ export function detectLayout(
   // Split: 1 image + any number of pure-text elements (paragraph/list/progress)
   // The SplitLayout renderer stacks all non-image elements in one column, so
   // nonImages.length > 1 is handled correctly — no BSP/grid needed.
-  const isPureText = (t: string) => t === 'paragraph' || t === 'list' || t === 'progress';
+  const isPureText = (t: string) => t === 'paragraph' || t === 'list' || t === 'progress' || t === 'blockquote';
   if (hasTitle && images.length === 1 && nonImages.length >= 1 && nonImages.every((e) => isPureText(e.type))) {
     return 'split';
   }
