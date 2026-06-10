@@ -746,6 +746,110 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
     return () => { unlisten.then((fn) => fn()); };
   }, []);
 
+  // Handle clipboard image paste via Ctrl/Cmd+V.
+  // We intercept keydown (not paste) so we can call the native GTK clipboard command
+  // asynchronously before deciding whether to preventDefault — WebKitGTK does not
+  // expose binary image data through e.clipboardData.items for system clipboard images.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handler = (e: KeyboardEvent) => {
+      if (!((e.ctrlKey || e.metaKey) && e.key === 'v')) return;
+
+      // Prevent the browser paste event so we control the full paste flow.
+      e.preventDefault();
+
+      void (async () => {
+        let imageBase64: string | null = null;
+        let pasteExt = 'png';
+
+        // Step 1: GTK native clipboard (Linux — WebKitGTK doesn't expose binary
+        // image data through e.clipboardData, so we read it natively).
+        try {
+          imageBase64 = await invoke<string>('read_clipboard_image');
+          // The Rust command always encodes as PNG.
+        } catch {
+          // Not Linux, or clipboard has no image.
+        }
+
+        // Step 2: Web Clipboard API (macOS WebKit, Windows WebView2).
+        // navigator.clipboard.read() accesses the system clipboard directly and
+        // correctly exposes image blobs on both platforms.
+        if (imageBase64 === null) {
+          try {
+            const clipboardItems = await navigator.clipboard.read();
+            for (const item of clipboardItems) {
+              const imageType = item.types.find((t) => t.startsWith('image/'));
+              if (imageType) {
+                const blob = await item.getType(imageType);
+                const arrayBuffer = await blob.arrayBuffer();
+                imageBase64 = btoa(
+                  Array.from(new Uint8Array(arrayBuffer)).map((b) => String.fromCharCode(b)).join('')
+                );
+                pasteExt = imageType.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+                break;
+              }
+            }
+          } catch {
+            // API not available or clipboard contains no image.
+          }
+        }
+
+        if (imageBase64 !== null) {
+          const docPath = filePathRef.current ?? null;
+          if (!docPath) {
+            onWarnRef.current?.('Save your document first before pasting images.');
+            return;
+          }
+          const docDir = docPath.substring(
+            0,
+            Math.max(docPath.lastIndexOf('/'), docPath.lastIndexOf('\\'))
+          );
+          try {
+            const savedFilename = await invoke<string>('write_asset_bytes', {
+              data: imageBase64,
+              filename: `paste-${Date.now()}.${pasteExt}`,
+              destDir: docDir,
+            });
+            const snippet = `![](assets/${encodeMarkdownPath(savedFilename)})`;
+            const view = viewRef.current;
+            if (!view) return;
+            const { from, to } = view.state.selection.main;
+            view.dispatch({
+              changes: { from, to, insert: snippet },
+              selection: EditorSelection.cursor(from + snippet.length),
+            });
+            view.focus();
+          } catch (err) {
+            console.error('[Kova] paste image failed:', err);
+            onWarnRef.current?.('Could not paste image.');
+          }
+          return;
+        }
+
+        // No image — fall back to plain-text paste.
+        const view = viewRef.current;
+        if (!view) return;
+        try {
+          const text = await navigator.clipboard.readText();
+          if (!text) return;
+          const { from, to } = view.state.selection.main;
+          view.dispatch({
+            changes: { from, to, insert: text },
+            selection: EditorSelection.cursor(from + text.length),
+          });
+          view.focus();
+        } catch {
+          // Clipboard read failed; nothing to paste.
+        }
+      })();
+    };
+
+    el.addEventListener('keydown', handler, { capture: true });
+    return () => el.removeEventListener('keydown', handler, { capture: true });
+  }, []);
+
   // Sync external content changes
   useEffect(() => {
     const view = viewRef.current;

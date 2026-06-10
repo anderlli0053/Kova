@@ -38,6 +38,7 @@ pub fn run() {
             commands::delete_theme,
             commands::download_and_cache_font,
             commands::set_wake_lock,
+            commands::read_clipboard_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
