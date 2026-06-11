@@ -148,7 +148,7 @@
 .sl-img-wrap--user { max-height: unset; max-width: unset; align-self: auto; }
 .sl-img { max-width: 100%; height: auto; object-fit: contain; display: block; }
 .sl-img-fill { width: 100%; height: 100%; object-fit: contain; display: block; }
-.sl-img-cover { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.sl-img-cover { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 .sl-blockquote {
   border-left: 3px solid var(--sl-accent);
@@ -296,7 +296,7 @@
 
 /* ── Full-bleed image ────────────────────────────────────────────────────── */
 
-.sl-full-bleed { height: 100%; overflow: hidden; position: relative; }
+.sl-full-bleed { position: absolute; top: 0; right: 0; bottom: 0; left: 0; overflow: hidden; }
 
 /* ── Quote ───────────────────────────────────────────────────────────────── */
 
