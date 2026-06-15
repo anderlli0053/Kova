@@ -39,6 +39,7 @@ pub fn run() {
             commands::download_and_cache_font,
             commands::set_wake_lock,
             commands::read_clipboard_image,
+            commands::fetch_url_b64,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -166,6 +166,18 @@ function getImageAspectRatio(src: string): Promise<number | null> {
   });
 }
 
+// Remote https:// images can't be fetched by PptxGenJS in WKWebView because
+// connect-src only allows specific domains. Fetch them natively via Tauri so
+// pres.write() always receives data: URLs and never needs to make network calls.
+async function fetchUrlToDataUrl(url: string): Promise<string> {
+  try {
+    const [b64, mime] = await invoke<[string, string]>('fetch_url_b64', { url });
+    return `data:${mime};base64,${b64}`;
+  } catch {
+    return url;
+  }
+}
+
 // Mermaid uses global DOM state and cannot handle concurrent render() calls —
 // running slides in parallel causes the second Mermaid render to hang forever.
 // Process everything sequentially so Mermaid renders one at a time.
@@ -177,6 +189,8 @@ async function resolveSlideImages(slides: Slide[], theme: Theme, warnings: strin
       if (el.type === 'image') {
         const src = (el.src.startsWith('asset://') || el.src.startsWith('tauri://'))
           ? await assetUrlToDataUrl(el.src)
+          : (el.src.startsWith('http://') || el.src.startsWith('https://'))
+          ? await fetchUrlToDataUrl(el.src)
           : el.src;
         const ar = src.startsWith('data:') ? await getImageAspectRatio(src) : null;
         elements.push({ ...el, src, title: ar != null ? String(ar) : el.title });

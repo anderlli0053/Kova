@@ -17,10 +17,11 @@ const JPEG_QUALITY = 0.95;
 const PIXEL_RATIO  = 2;
 
 // On macOS WKWebView, canvas.toDataURL() throws a SecurityError when the canvas
-// contains any image loaded via asset:// (not in connect-src CSP). Pre-resolve
-// those <img> src attributes to data: URLs using the native Tauri command so the
+// contains images loaded from cross-origin sources (asset:// or remote https://)
+// because the webview's CSP connect-src blocks fetch() to those URLs. Pre-resolve
+// all such <img> src attributes to data: URLs via native Tauri commands so the
 // canvas stays untainted during html-to-image capture.
-async function preResolveAssetImages(el: HTMLElement): Promise<void> {
+async function preResolveExternalImages(el: HTMLElement): Promise<void> {
   function extToMime(ext: string): string {
     if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
     if (ext === 'gif')  return 'image/gif';
@@ -29,18 +30,25 @@ async function preResolveAssetImages(el: HTMLElement): Promise<void> {
   }
   const imgs = Array.from(el.querySelectorAll<HTMLImageElement>('img'));
   await Promise.all(imgs.map(async (img) => {
-    if (!img.src.startsWith('asset://')) return;
+    const src = img.src;
+    let dataUrl: string | null = null;
     try {
-      const path = decodeURIComponent(img.src.replace(/^asset:\/\/[^/]*/, ''));
-      const ext  = path.split('.').pop()?.toLowerCase() ?? 'png';
-      const b64  = await invoke<string>('read_file_b64', { path });
-      const dataUrl = `data:${extToMime(ext)};base64,${b64}`;
-      await new Promise<void>((resolve) => {
-        img.onload  = () => resolve();
-        img.onerror = () => resolve();
-        img.src = dataUrl;
-      });
+      if (src.startsWith('asset://')) {
+        const path = decodeURIComponent(src.replace(/^asset:\/\/[^/]*/, ''));
+        const ext  = path.split('.').pop()?.toLowerCase() ?? 'png';
+        const b64  = await invoke<string>('read_file_b64', { path });
+        dataUrl = `data:${extToMime(ext)};base64,${b64}`;
+      } else if (src.startsWith('http://') || src.startsWith('https://')) {
+        const [b64, mime] = await invoke<[string, string]>('fetch_url_b64', { url: src });
+        dataUrl = `data:${mime};base64,${b64}`;
+      }
     } catch { /* leave original src */ }
+    if (!dataUrl) return;
+    await new Promise<void>((resolve) => {
+      img.onload  = () => resolve();
+      img.onerror = () => resolve();
+      img.src = dataUrl!;
+    });
   }));
 }
 
@@ -48,8 +56,8 @@ async function preResolveAssetImages(el: HTMLElement): Promise<void> {
 // This avoids modifying the DOM before capture and avoids relying on
 // the off-screen SlideRenderer's Mermaid renders completing in time.
 async function captureSlide(slideEl: HTMLElement, theme: Theme): Promise<string> {
-  // Pre-resolve asset:// images to data: URLs so the canvas stays untainted on macOS.
-  await preResolveAssetImages(slideEl);
+  // Pre-resolve asset:// and remote https:// images to data: URLs so the canvas stays untainted on macOS.
+  await preResolveExternalImages(slideEl);
 
   // Step 1: base screenshot — Mermaid areas may be placeholders or broken SVG,
   // but all other content (background, text, images) captures correctly.
