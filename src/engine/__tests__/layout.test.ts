@@ -250,3 +250,45 @@ describe('overflow guard', () => {
     expect(detectLayout([table], 2, true)).toBe('title-content');
   });
 });
+
+// ── CJK / wide-character overflow estimate ───────────────────────────────────
+// autoLayout.ts weights CJK/Hangul/fullwidth characters as double-width when
+// estimating line count, since they render roughly twice as wide as Latin
+// characters at the same font size. These cases are sized so a naive
+// `.length`-based estimate and the actual visualLength()-based estimate land
+// on opposite sides of OVERFLOW_LINE_THRESHOLD (10) — i.e. they'd fail if the
+// CJK weighting regressed back to a plain character count.
+
+function makeUniformList(itemCount: number, charsPerItem: number, char: string): SlideElement {
+  const text = char.repeat(charsPerItem);
+  return {
+    type: 'list', ordered: false,
+    items: Array.from({ length: itemCount }, () => ({ text, html: text, children: [] })),
+  };
+}
+
+describe('CJK / wide-character overflow estimate', () => {
+  it('CJK list crosses the two-column threshold that a plain character count would miss', () => {
+    // 6 items x 60 CJK chars: unweighted that's ceil(60/70)=1 line/item (6
+    // total, under threshold); weighted for double-width it's ceil(120/70)=2
+    // lines/item (12 total, over threshold).
+    expect(detectLayout([makeUniformList(6, 60, '日')], 2, true)).toBe('two-column');
+  });
+
+  it('same shape (6 items, 60 chars) in Latin text stays title-content', () => {
+    // Isolates the variable: identical item/char count, but single-width
+    // characters never cross the threshold either way (6 lines, not 12) —
+    // confirms the fix is specifically about character width, not a general
+    // threshold change.
+    expect(detectLayout([makeUniformList(6, 60, 'x')], 2, true)).toBe('title-content');
+  });
+
+  it('CJK paragraphs cross the two-column threshold the same way (paragraph branch, not just list)', () => {
+    // Two paragraphs (not a list) so canSplitIntoColumns is satisfied via
+    // bodyElements.length > 1 instead. Unweighted: ceil(250/90)=3 lines each
+    // (6 total, under threshold). Weighted: ceil(500/90)=6 lines each (12
+    // total, over threshold).
+    const cjkPara: SlideElement = { type: 'paragraph', text: '日'.repeat(250), html: '' };
+    expect(detectLayout([cjkPara, cjkPara], 2, true)).toBe('two-column');
+  });
+});

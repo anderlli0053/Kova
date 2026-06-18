@@ -1,9 +1,9 @@
 import { toJpeg } from 'html-to-image';
 import jsPDF from 'jspdf';
-import mermaid from 'mermaid';
 import { invoke } from '@tauri-apps/api/core';
 import { mermaidSvgCache } from './mermaidSvgCache';
 import { svgToPngDataUrl } from './svgToPng';
+import { queuedMermaidRender } from './mermaidRenderQueue';
 import type { AspectRatio } from '../types';
 import type { Theme } from '../theme';
 
@@ -94,16 +94,13 @@ async function captureSlide(slideEl: HTMLElement, theme: Theme): Promise<string>
 
     let cached = mermaidSvgCache.get(source);
     if (!cached) {
-      // Cache miss: render sequentially so Mermaid's global DOM state isn't
-      // corrupted by concurrent calls. 15 s timeout mirrors the PPTX exporter.
+      // Cache miss: queuedMermaidRender serializes this against every other
+      // render() call in the app (including the off-screen SlideRenderer trees
+      // that mount simultaneously for this very export), not just other
+      // diagrams within this loop — see mermaidRenderQueue.ts.
       try {
         const id = `pdf-mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const result = await Promise.race<{ svg: string }>([
-          mermaid.render(id, source),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 15_000),
-          ),
-        ]);
+        const result = await queuedMermaidRender(id, source);
         mermaidSvgCache.set(source, result.svg);
         cached = result.svg;
       } catch {

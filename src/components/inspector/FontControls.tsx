@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { ThemeFonts } from '../../engine/theme';
+import { isFontAvailable } from '../../engine/fontDetect';
 
 interface Props {
   fonts: ThemeFonts;
@@ -187,10 +188,26 @@ export function FontControls({ fonts, onChange }: Props) {
           });
         }
 
+        // Curated entries list fonts by their full CSS fallback stack (e.g.
+        // "Helvetica Neue, Arial, sans-serif"), so a missing primary font
+        // still renders fine via its fallback — only warn when the *whole*
+        // family name as stored (which is what custom/system selections are)
+        // isn't actually available, since that's the case with no built-in
+        // fallback to catch it.
+        const primaryUnavailable = Boolean(current) && !curatedValues.has(current) && !isFontAvailable(current);
+
         return (
           <div key={key}>
-            <label style={{ fontSize: 11, color: 'var(--text-label)', display: 'block', marginBottom: 3 }}>
+            <label style={{ fontSize: 11, color: 'var(--text-label)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
               {label}
+              {primaryUnavailable && (
+                <span
+                  title={`"${current.split(',')[0].trim()}" isn't installed on this computer. Kova is falling back to a substitute font here — and the same substitution may happen differently (or not at all) on another OS, so this deck may look different when opened elsewhere.`}
+                  style={{ color: 'var(--dirty-color)', cursor: 'help', fontSize: 12, lineHeight: 1 }}
+                >
+                  ⚠
+                </span>
+              )}
             </label>
             <FontSelect value={current} groups={groups} onChange={(v) => onChange(key, v)} />
           </div>

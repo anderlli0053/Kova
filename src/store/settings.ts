@@ -2,6 +2,7 @@ import { detectOsLanguage } from '../engine/spellcheck/spellChecker';
 
 export type PresentationMode  = 'auto' | 'single' | 'dual' | 'mirror';
 export type NotesFontSize     = 'sm' | 'md' | 'lg';
+export type StartupBehavior   = 'blank' | 'reopenLast';
 
 export const LASER_COLOR_OPTIONS = [
   { value: '#ff2020', label: 'Red'    },
@@ -46,6 +47,8 @@ export interface AppSettings {
   showFrontmatter: boolean;
   // Presentation defaults
   defaultThemeId: string;
+  // Startup
+  startupBehavior: StartupBehavior;
 }
 
 const KEY = 'kova:settings';
@@ -67,6 +70,9 @@ function buildDefaults(): AppSettings {
     laserColor: '#ff2020',
     showFrontmatter: false,
     defaultThemeId: 'light',
+    // Preserves existing behaviour (always launch blank) for anyone upgrading
+    // — this only changes anything for users who explicitly opt in.
+    startupBehavior: 'blank',
   };
 }
 

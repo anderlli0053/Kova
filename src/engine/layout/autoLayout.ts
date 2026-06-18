@@ -25,9 +25,27 @@ function logicalElementCount(elements: SlideElement[]): number {
   return count;
 }
 
+// CJK/Hangul/fullwidth characters render roughly twice as wide as Latin
+// characters at the same font size, so a straight `.length` count badly
+// under-estimates rendered line count for non-Latin scripts — a slide of
+// e.g. Japanese body text could be well past the overflow threshold while
+// this heuristic still thinks it comfortably fits in one column. Counting
+// each wide character as 2 "columns" instead of 1 brings the estimate back
+// in line with the same chars-per-line constants calibrated for Latin text.
+// Ranges: CJK punctuation/symbols, Hiragana, Katakana, CJK Unified
+// Ideographs (+ Ext A), Hangul Syllables, CJK compatibility, fullwidth forms.
+const WIDE_CHAR_RE = /[⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿＀-｠￠-￦]/;
+
+/** Counts `text` in "Latin-character equivalents" — wide scripts count double. */
+function visualLength(text: string): number {
+  let n = 0;
+  for (const ch of text) n += WIDE_CHAR_RE.test(ch) ? 2 : 1;
+  return n;
+}
+
 function estimateItemLines(item: ListItem): number {
   // ~70 chars/line: proportional body font at 18px across a half-slide column
-  const self = Math.max(1, Math.ceil(item.text.length / 70));
+  const self = Math.max(1, Math.ceil(visualLength(item.text) / 70));
   const children = item.children.reduce((n, c) => n + estimateItemLines(c), 0);
   return self + children;
 }
@@ -42,7 +60,7 @@ function estimateLines(elements: SlideElement[]): number {
       case 'paragraph': {
         // ~90 chars/line: proportional body font at 18px across ~826px usable width
         const lines = el.text.split('\n').filter(Boolean);
-        total += lines.reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 90)), 0);
+        total += lines.reduce((n, l) => n + Math.max(1, Math.ceil(visualLength(l) / 90)), 0);
         break;
       }
       case 'progress':

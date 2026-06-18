@@ -97,6 +97,13 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* A single long unbroken token (URL, long compound word, etc.) would
+     otherwise overflow its column horizontally rather than wrap — this is
+     already set on code blocks below but not on body text. overflow-wrap is
+     inherited, so setting it once here covers every layout's text content
+     (paragraphs, lists, quotes, table cells, title subtitles, ...) without
+     needing the same rule repeated on each layout's own class. */
+  overflow-wrap: break-word;
 }
 
 /* ── Shared typography ───────────────────────────────────────────────────── */

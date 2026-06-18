@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
-import type { AppSettings, PresentationMode, NotesFontSize, LaserColor } from '../store/settings';
+import type { AppSettings, PresentationMode, NotesFontSize, LaserColor, StartupBehavior } from '../store/settings';
 import { EDITOR_FONT_OPTIONS, LASER_COLOR_OPTIONS } from '../store/settings';
 import type { Theme } from '../engine/theme';
 import { isFontAvailable } from '../engine/fontDetect';
@@ -531,6 +531,23 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
           description="Ask for confirmation when closing a file with unsaved changes."
           control={<Toggle checked={settings.confirmOnClose} onChange={(v) => set('confirmOnClose', v)} />}
         />
+
+        <div style={{ padding: '10px 0' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>On startup</div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+            Window size and position are always restored. This controls the document.
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {([
+              { value: 'blank',      label: 'Blank document' },
+              { value: 'reopenLast', label: 'Reopen last file' },
+            ] as { value: StartupBehavior; label: string }[]).map(({ value, label }) => (
+              <button key={value} type="button" onClick={() => set('startupBehavior', value)}
+                style={groupBtnStyle(settings.startupBehavior === value)}
+              >{label}</button>
+            ))}
+          </div>
+        </div>
 
         {/* Presentation */}
         <Section label="Presentation" />

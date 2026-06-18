@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { memo, useCallback, useRef, useEffect, useState } from 'react';
 import type { Slide, AspectRatio } from '../../engine/types';
 import type { Theme } from '../../engine/theme';
 import { DEFAULT_THEME } from '../../engine/theme';
@@ -149,7 +149,10 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, them
     };
   }, [onReorder]);
 
-  function handleThumbMouseDown(index: number, e: React.MouseEvent) {
+  // Stable identity (depends only on onReorder, itself stable from App.tsx)
+  // so it can be passed straight through to the memoized Thumbnail below
+  // without defeating the memo on every ThumbnailPanel render.
+  const handleThumbMouseDown = useCallback((index: number, e: React.MouseEvent) => {
     if (!onReorder || e.button !== 0) return;
     e.preventDefault(); // prevent text selection during drag
     dragRef.current = { fromIndex: index, overIndex: index };
@@ -157,7 +160,7 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, them
     setDragOverIndex(index);
     document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
-  }
+  }, [onReorder]);
 
   const thumbH = Math.round(slideH * scale);
 
@@ -184,8 +187,8 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, them
                   isActive={i === currentIndex}
                   isDragSource={dragFromIndex === i}
                   canDrag={Boolean(onReorder)}
-                  onClick={() => onSelect(i)}
-                  onMouseDown={(e) => handleThumbMouseDown(i, e)}
+                  onSelect={onSelect}
+                  onDragStart={handleThumbMouseDown}
                   theme={theme}
                   docTitle={docTitle}
                   scale={scale}
@@ -220,8 +223,8 @@ interface ThumbnailProps {
   isActive: boolean;
   isDragSource: boolean;
   canDrag: boolean;
-  onClick: () => void;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onSelect: (index: number) => void;
+  onDragStart: (index: number, e: React.MouseEvent) => void;
   theme: Theme;
   docTitle?: string;
   slideH: number;
@@ -229,7 +232,14 @@ interface ThumbnailProps {
   thumbH: number;
 }
 
-function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, canDrag, onClick, onMouseDown, theme, docTitle, slideH, scale, thumbH }: ThumbnailProps) {
+// Memoized so an edit to one slide's content — which, thanks to the
+// reference-stable `slide` prop from App.tsx/parseDocument, only changes
+// *that* slide's prop identity — doesn't force every other thumbnail (and
+// its own Mermaid/KaTeX/highlight.js rendering) to redo work on every
+// keystroke. `onSelect`/`onDragStart` are forwarded as stable function
+// references (bound internally below) rather than passed as pre-bound
+// closures, specifically so they don't defeat this memoization.
+const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, canDrag, onSelect, onDragStart, theme, docTitle, slideH, scale, thumbH }: ThumbnailProps) {
   const thumbRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -240,8 +250,8 @@ function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, canDrag,
     <div
       ref={thumbRef}
       data-slide-index={index}
-      onClick={onClick}
-      onMouseDown={onMouseDown}
+      onClick={() => onSelect(index)}
+      onMouseDown={(e) => onDragStart(index, e)}
       style={{
         marginBottom: 8,
         cursor: canDrag ? 'grab' : 'pointer',
@@ -296,4 +306,4 @@ function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, canDrag,
       </div>
     </div>
   );
-}
+});

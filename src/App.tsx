@@ -20,6 +20,7 @@ import { ImportPptxModal } from './components/ImportPptxModal';
 import { MissingThemeBanner } from './components/MissingThemeBanner';
 import { loadSettings, saveSettings, EDITOR_FONT_OPTIONS } from './store/settings';
 import type { AppSettings } from './store/settings';
+import { loadLastSession, saveLastSession } from './store/lastSession';
 import { loadKeybindings, matchShortcut, getCombo, formatCombo } from './engine/keybindings';
 import type { Keybindings } from './engine/keybindings';
 
@@ -213,6 +214,18 @@ export default function App() {
 
   // Rewrite relative image srcs to asset:// URLs so Tauri's WebView can load them.
   // Always runs — absolute paths need convertFileSrc even when no file is open.
+  //
+  // resolvedSlidesCacheRef keys by the *input* Slide object's identity:
+  // parseDocument (markdownToSlides.ts) already reuses the previous Slide
+  // object for any slide whose raw text is unchanged, so caching this step
+  // the same way means an edit to one slide no longer produces a brand-new
+  // object for *every* slide in the deck — which in turn is what lets
+  // ThumbnailPanel's React.memo (below) actually skip re-rendering slides the
+  // user isn't currently editing. WeakMap so entries for slides that no
+  // longer exist (deleted, or shifted out of cache by an insertion) are
+  // garbage-collected rather than accumulating for the life of the session.
+  const resolvedSlidesCacheRef = useRef<{ docDir: string; cache: WeakMap<Slide, Slide> }>({ docDir: '', cache: new WeakMap() });
+
   const slides = useMemo<Slide[]>(() => {
     const lastSlash = filePath
       ? Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
@@ -223,15 +236,30 @@ export default function App() {
       return { ...item, html: resolveHtmlSrcs(item.html, docDir), children: item.children.map(resolveItem) };
     }
 
-    return rawSlides.map((slide) => ({
-      ...slide,
-      elements: slide.elements.map((el) => {
-        if (el.type === 'image')     return { ...el, src: resolveImageSrc(el.src, docDir) };
-        if (el.type === 'paragraph') return { ...el, html: resolveHtmlSrcs(el.html, docDir) };
-        if (el.type === 'list')      return { ...el, items: el.items.map(resolveItem) };
-        return el;
-      }),
-    }));
+    let cacheHolder = resolvedSlidesCacheRef.current;
+    if (cacheHolder.docDir !== docDir) {
+      // docDir changed (file opened/saved-as/renamed) — every resolved src
+      // would be wrong now, so start fresh rather than risk a stale hit.
+      cacheHolder = { docDir, cache: new WeakMap() };
+      resolvedSlidesCacheRef.current = cacheHolder;
+    }
+    const { cache } = cacheHolder;
+
+    return rawSlides.map((slide) => {
+      const cached = cache.get(slide);
+      if (cached) return cached;
+      const resolved: Slide = {
+        ...slide,
+        elements: slide.elements.map((el) => {
+          if (el.type === 'image')     return { ...el, src: resolveImageSrc(el.src, docDir) };
+          if (el.type === 'paragraph') return { ...el, html: resolveHtmlSrcs(el.html, docDir) };
+          if (el.type === 'list')      return { ...el, items: el.items.map(resolveItem) };
+          return el;
+        }),
+      };
+      cache.set(slide, resolved);
+      return resolved;
+    });
   }, [rawSlides, filePath]);
 
   // Compute a safe index in the same render as slides so children never receive
@@ -544,6 +572,56 @@ export default function App() {
     invoke('set_wake_lock', { active: presentMode || presenterMode }).catch(() => {});
   }, [presentMode, presenterMode]);
 
+  // Set once we've explicitly decided to let a close-requested event through
+  // (after the user confirmed, or there was nothing to confirm), so the
+  // `getCurrentWindow().close()` call below doesn't re-enter onCloseRequested
+  // and prompt a second time.
+  const bypassCloseConfirmRef = useRef(false);
+
+  const actuallyCloseWindow = useCallback(async () => {
+    // Unconditional: guarantees the macOS `caffeinate` child (and the Linux
+    // DBus screensaver inhibit) are released on every normal quit path, not
+    // just the ones that remembered to flip presentMode/presenterMode off
+    // first. A crash/kill -9 can't be intercepted from user space — this only
+    // covers the normal "ask before quit" paths below.
+    await invoke('set_wake_lock', { active: false }).catch(() => {});
+    bypassCloseConfirmRef.current = true;
+    try {
+      await getCurrentWindow().close();
+    } finally {
+      bypassCloseConfirmRef.current = false;
+    }
+  }, []);
+
+  const actuallyExitApp = useCallback(async () => {
+    await invoke('set_wake_lock', { active: false }).catch(() => {});
+    await invoke('confirm_exit').catch(() => {});
+  }, []);
+
+  // Window-level close: clicking Kova's own close button, Alt+F4, the taskbar
+  // "Close window" entry, etc. Tauri's window manager automatically calls
+  // prevent_close() for us as long as a JS listener is registered (see
+  // manager/window.rs upstream) — we still call event.preventDefault()
+  // explicitly so the contract doesn't depend on that implementation detail.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow().onCloseRequested((event) => {
+      if (bypassCloseConfirmRef.current) return; // already confirmed — let this one through
+      event.preventDefault();
+      guardDirty(actuallyCloseWindow);
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, [guardDirty, actuallyCloseWindow]);
+
+  // App-level quit (Cmd+Q / Dock "Quit" on macOS, or any other path that exits
+  // the whole app rather than just this window) — see the matching
+  // RunEvent::ExitRequested handler in lib.rs. This never fires for the
+  // window-level close above, so both need their own guard.
+  useEffect(() => {
+    const unlisten = listen('app-exit-requested', () => { guardDirty(actuallyExitApp); });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [guardDirty, actuallyExitApp]);
+
   // When the audience window has OS focus (common on Wayland where compositors
   // ignore focus:false), forward its keydown events so arrow-key navigation
   // works in the presenter without requiring a manual click.
@@ -621,6 +699,40 @@ export default function App() {
     setCurrentSlideIndex(0);
     await invoke('start_watching', { path }).catch(console.error);
   }, [allThemes]);
+
+  // Startup restore — only when the user has opted in via Settings. Best-effort:
+  // a deleted/moved/unreadable file just leaves the app at its normal blank
+  // startup state rather than surfacing an error for what is, after all, a
+  // convenience feature. Runs once on mount; settings.startupBehavior at the
+  // time of mount is what matters (changing the setting later only affects
+  // the *next* launch, not the current session).
+  useEffect(() => {
+    if (settings.startupBehavior !== 'reopenLast') return;
+    const session = loadLastSession();
+    if (!session) return;
+    (async () => {
+      try {
+        const text: string = await invoke('read_file', { path: session.path });
+        await applyFileContent(text, session.path);
+        // applyFileContent itself resets to slide 0 — apply the saved position
+        // after it resolves so this wins. Out-of-range values are corrected by
+        // the existing slide-index clamp effect once `slides` is recomputed.
+        setCurrentSlideIndex(session.slideIndex);
+        setTimeout(() => editorRef.current?.scrollToSlide(session.slideIndex), 50);
+      } catch (err) {
+        console.warn('[kova] could not restore last session:', err);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally runs once on mount
+
+  // Keep the last-session record current so it's accurate whenever the app
+  // actually quits. Mirrors the literal on-screen state: clears the record
+  // when there's no open file (e.g. after File > New) rather than leaving a
+  // stale pointer to whatever was open before.
+  useEffect(() => {
+    saveLastSession(filePath ? { path: filePath, slideIndex: safeSlideIndex } : null);
+  }, [filePath, safeSlideIndex]);
 
   const handleMarkdownDrop = useCallback((path: string) => {
     const doOpen = async () => {
@@ -905,12 +1017,26 @@ export default function App() {
     }
   }, [settings.uiTheme]);
 
-  // Autosave — only when enabled, a file path exists, and there are unsaved changes
+  // handleSave gets a new identity on every keystroke (it depends on `content`
+  // via buildSaveContent). A ref lets the autosave timer below call the latest
+  // save logic without including that ever-changing identity in its own
+  // dependency array — see the effect's comment for why that matters.
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
+  // Autosave — only when enabled, a file path exists, and there are unsaved changes.
+  // Deliberately excludes `handleSave` from the dependency array: if it were
+  // included, the timer would be torn down and restarted on every keystroke
+  // (handleSave's identity changes with `content`), so the countdown would
+  // perpetually reset to zero and autosave would never actually fire during
+  // continuous editing. isDirty's false→true transition is what starts the
+  // timer; it then runs uninterrupted every autosaveIntervalSeconds until the
+  // next save (isDirty back to false) regardless of further keystrokes.
   useEffect(() => {
     if (!settings.autosave || !filePath || !isDirty) return;
-    const id = setInterval(handleSave, settings.autosaveIntervalSeconds * 1000);
+    const id = setInterval(() => { handleSaveRef.current(); }, settings.autosaveIntervalSeconds * 1000);
     return () => clearInterval(id);
-  }, [settings.autosave, settings.autosaveIntervalSeconds, filePath, isDirty, handleSave]);
+  }, [settings.autosave, settings.autosaveIntervalSeconds, filePath, isDirty]);
 
   useEffect(() => {
     const sc = (id: string) => getCombo(keybindings.combos, id);
@@ -1046,7 +1172,7 @@ export default function App() {
           <div className="wm-controls wm-controls--mac">
             <button
               className="wm-btn wm-btn--close"
-              onMouseDown={(e) => { e.preventDefault(); guardDirty(() => getCurrentWindow().close()); }}
+              onMouseDown={(e) => { e.preventDefault(); getCurrentWindow().close(); }}
               title="Close"
             >
               <svg width="11" height="11" viewBox="0 0 11 11">
@@ -1106,7 +1232,7 @@ export default function App() {
                 {printContext ? 'Preparing Print…' : 'Print…'}
               </button>
               <div className="btn-group-menu-separator" />
-              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => getCurrentWindow().close()); }}>
+              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); getCurrentWindow().close(); }}>
                 Exit
               </button>
             </div>
@@ -1215,7 +1341,7 @@ export default function App() {
               className="wm-btn wm-btn--close"
               onMouseDown={(e) => {
                 e.preventDefault();
-                guardDirty(() => getCurrentWindow().close());
+                getCurrentWindow().close();
               }}
               title="Close"
             >

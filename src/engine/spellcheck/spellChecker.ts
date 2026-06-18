@@ -71,6 +71,20 @@ const customWords = new Set<string>(loadCustomWords());
 const ignored = new Set<string>();
 const changeListeners = new Set<() => void>();
 
+// spellCheckExtension.ts re-checks every word in the document on each edit
+// (debounced 350ms) — for a large deck, most of that cost is calling
+// active.check() repeatedly on the same handful of words (the documentation
+// equivalent of "the", "a", names, recurring technical terms, etc.). This
+// caches by the exact word as passed in (not lowercased — active.check() is
+// case-sensitive for some dictionary rules, e.g. acronym exceptions, so "The"
+// and "THE" must be allowed to cache separately). Cleared from notifyChange()
+// so it can never go stale across a dictionary swap or a custom/ignored word
+// change — every mutation path below already calls notifyChange(), so this
+// piggybacks on an existing, already-correct invalidation signal rather than
+// adding a new one. Never evicted otherwise, same as mermaidSvgCache
+// elsewhere in this codebase — bounded by vocabulary size, not document size.
+const spellCheckCache = new Map<string, boolean>();
+
 function loadCustomWords(): string[] {
   try { return JSON.parse(localStorage.getItem(CUSTOM_WORDS_KEY) ?? '[]'); }
   catch { return []; }
@@ -86,6 +100,7 @@ export function onSpellCheckerChange(cb: () => void): () => void {
 }
 
 function notifyChange(): void {
+  spellCheckCache.clear();
   changeListeners.forEach(cb => cb());
 }
 
@@ -121,7 +136,11 @@ export function spellCheck(word: string): boolean {
   if (!active) return true;
   const lc = word.toLowerCase();
   if (customWords.has(lc) || ignored.has(lc)) return true;
-  return active.check(word);
+  const cached = spellCheckCache.get(word);
+  if (cached !== undefined) return cached;
+  const result = active.check(word);
+  spellCheckCache.set(word, result);
+  return result;
 }
 
 export function spellSuggest(word: string): string[] {

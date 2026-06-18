@@ -40,7 +40,16 @@ export async function svgToPngDataUrl(
 
       if (nonEmpty.length === 0) { fo.remove(); continue; }
 
-      const fontSize   = 14;
+      // Read the *actual* computed font rather than guessing — the container is
+      // already attached to document.body at this point, so Mermaid's own
+      // embedded <style> block (populated from the theme's fontFamily via
+      // buildMermaidInit/buildExportMermaidInit) is already cascading onto this
+      // element. Falls back to the previous hardcoded values only if there's no
+      // child element to measure (foreignObject with a bare text node, etc.).
+      const refEl   = fo.querySelector('*');
+      const computed = refEl ? window.getComputedStyle(refEl) : null;
+      const fontSize   = (computed && parseFloat(computed.fontSize)) || 14;
+      const fontFamily = (computed && computed.fontFamily) || 'Arial, sans-serif';
       const lineHeight = fontSize * 1.35;
       const blockH     = nonEmpty.length * lineHeight;
       const startY     = foY + (foH - blockH) / 2 + fontSize * 0.85;
@@ -48,7 +57,7 @@ export async function svgToPngDataUrl(
       const textEl = document.createElementNS(ns, 'text');
       textEl.setAttribute('text-anchor', 'middle');
       textEl.setAttribute('font-size', String(fontSize));
-      textEl.setAttribute('font-family', 'Arial, sans-serif');
+      textEl.setAttribute('font-family', fontFamily);
       nonEmpty.forEach((line, i) => {
         const tspan = document.createElementNS(ns, 'tspan');
         tspan.setAttribute('x', String(cx));

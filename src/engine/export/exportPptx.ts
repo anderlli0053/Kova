@@ -2,6 +2,7 @@ import PptxGenJS from 'pptxgenjs';
 import { invoke } from '@tauri-apps/api/core';
 import { mermaidSvgCache } from './mermaidSvgCache';
 import { svgToPngDataUrl } from './svgToPng';
+import { queuedMermaidRender } from './mermaidRenderQueue';
 import mermaid from 'mermaid';
 import hljs from 'highlight.js';
 import type { Slide, SlideElement, Frontmatter } from '../types';
@@ -79,10 +80,6 @@ function buildExportMermaidInit(t: Theme): string {
 }
 
 
-function makeMermaidTimeout(ms: number): Promise<never> {
-  return new Promise((_, reject) => setTimeout(() => reject(new Error('Mermaid render timeout')), ms));
-}
-
 async function mermaidToDataUrl(value: string, t: Theme): Promise<{ dataUrl: string; aspectRatio: number } | null> {
   // Prefer the SVG already rendered by the live preview — calling mermaid.render()
   // concurrently hangs when the same diagram is already present in the live-preview DOM.
@@ -95,14 +92,16 @@ async function mermaidToDataUrl(value: string, t: Theme): Promise<{ dataUrl: str
     }
   }
 
-  // Cache miss (slide not yet visible in preview): fall back to direct render.
+  // Cache miss (slide not yet visible in preview): fall back to direct render,
+  // serialized via queuedMermaidRender against every other render() call in
+  // the app (not just other calls within this export) — see mermaidRenderQueue.ts.
   const init = buildExportMermaidInit(t);
   const normalised = value.replace(/\\n/g, '<br/>');
   const id = `pptx-mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   try {
     const src = normalised.trimStart().startsWith('%%{') ? normalised : init + normalised;
-    const { svg } = await Promise.race([mermaid.render(id, src), makeMermaidTimeout(15000)]);
+    const { svg } = await queuedMermaidRender(id, src);
     return await svgToPngDataUrl(svg, t.colors.background);
   } catch {
     return null;
@@ -969,6 +968,12 @@ function addCodeBlock(s: PS, value: string, lang: string | undefined, t: Theme, 
     fontFace: firstFont(t.fonts.code),
     align: 'left', valign: 'top',
     wrap: false,
+    // Box height is already clamped to the slide above; shrinkText is a
+    // PowerPoint-side autofit hint for excess *line count* (applied on first
+    // edit/resize in PowerPoint — see the comment in addElements). It does
+    // nothing for excess *line length* since wrap is intentionally off here
+    // to preserve code indentation/alignment.
+    shrinkText: true,
   });
 }
 
@@ -1061,6 +1066,14 @@ function addElements(s: PS, elements: SlideElement[], t: Theme, area: Area, warn
       fontSize: 18, color: hex(t.colors.text),
       fontFace: firstFont(t.fonts.body),
       valign: 'top', wrap: true,
+      // Unlike the live preview's OverflowPane (which measures real DOM height
+      // and applies a CSS scale-to-fit), PptxGenJS has no way to pre-shrink text
+      // at export time — shrinkText only sets PowerPoint's "Shrink text on
+      // overflow" autofit flag, which PowerPoint itself applies the next time the
+      // box is edited or resized (pptxgenjs can't trigger that calculation here).
+      // It's a partial mitigation — the box opens at full size and self-corrects
+      // on first edit — rather than nothing, which is what dense slides had before.
+      shrinkText: true,
     });
   }
 
@@ -1103,15 +1116,21 @@ function addElements(s: PS, elements: SlideElement[], t: Theme, area: Area, warn
     const textFrac = runs.length > 0 ? Math.min(0.5, 0.15 + runs.length * 0.08) : 0;
     const tableY = area.y + area.h * textFrac;
     const tableH = area.h * (1 - textFrac - 0.02);
-    addTable(s, tableEl, t, { x: area.x, y: tableY, w: area.w, h: tableH });
+    addTable(s, tableEl, t, { x: area.x, y: tableY, w: area.w, h: tableH }, warnings);
   }
 }
+
+// Rough estimate of a single table row's rendered height at fontSize 14 with
+// PptxGenJS's default cell margins — used only to decide whether to warn that
+// autoPage will likely split the table across additional slides.
+const EST_ROW_H = 0.35;
 
 function addTable(
   s: PS,
   el: Extract<SlideElement, { type: 'table' }>,
   t: Theme,
   area: Area,
+  warnings: string[],
 ) {
   const headerRow = el.headers.map((h) => ({
     text: h,
@@ -1125,11 +1144,30 @@ function addTable(
   const bodyRows = el.rows.map((row) =>
     row.map((cell) => ({ text: cell, options: { color: hex(t.colors.text), fontSize: 14 } }))
   );
+
+  const estimatedH = (el.rows.length + 1) * EST_ROW_H;
+  if (estimatedH > area.h) {
+    warnings.push(
+      `Table with ${el.rows.length} rows (header: "${el.headers.join(', ')}") is too tall for its slide and was ` +
+      'split across additional slides by PowerPoint auto-paging — those continuation slides will not have the ' +
+      'theme background, header, or footer applied.',
+    );
+  }
+
   s.addTable([headerRow, ...bodyRows], {
-    x: area.x, y: area.y, w: area.w,
+    x: area.x, y: area.y, w: area.w, h: area.h,
     fontSize: 14,
     fontFace: firstFont(t.fonts.body),
     border: { color: hex(t.colors.accent), pt: 0.5 },
+    // Without autoPage, a table taller than `h` just overflows the slide edge
+    // with no indication anything is missing. autoPage instead creates
+    // additional slides to hold the remaining rows (repeating the header row
+    // on each) — those continuation slides are plain PptxGenJS slides, not
+    // run through addSlide(), so they won't carry Kova's background/
+    // header/footer/logo. Still strictly better than silently losing rows.
+    autoPage: true,
+    autoPageRepeatHeader: true,
+    autoPageHeaderRows: 1,
   });
 }
 

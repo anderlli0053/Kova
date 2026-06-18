@@ -13,11 +13,30 @@ import { extractSpeakerNotes } from './speakerNotes';
 
 const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
+// Reuses the previous call's Slide objects (by position) whenever a slide's
+// raw text is byte-identical to last time. Without this, every keystroke
+// re-parses and rebuilds the *entire* deck's Slide objects (remark, KaTeX,
+// highlight.js classification, etc. for every slide, not just the one being
+// edited) — and since the result is a brand-new object graph each time, any
+// downstream React.memo on a per-slide component (e.g. ThumbnailPanel) can
+// never skip a re-render either, because the prop reference always changes.
+// Positional (not content-hash) comparison: a slide insertion/deletion shifts
+// every later index out of alignment and is a deliberate, accepted miss —
+// simpler and bounded (one prior array, no growing cache) at the cost of not
+// optimising that less-common edit. Module-level cache mirrors the existing
+// mermaidSvgCache pattern elsewhere in this codebase.
+let prevRawSlides: string[] = [];
+let prevParsedSlides: Slide[] = [];
+
 export function parseDocument(rawContent: string): ParsedDocument {
   const normalised = rawContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   const { frontmatter, body } = extractFrontmatter(normalised);
   const rawSlides = body.split(/^---$/m).map((s) => s.trim()).filter(Boolean);
-  const slides = rawSlides.map((raw, index) => parseSlide(raw, index));
+  const slides = rawSlides.map((raw, index) =>
+    raw === prevRawSlides[index] && prevParsedSlides[index] ? prevParsedSlides[index] : parseSlide(raw, index),
+  );
+  prevRawSlides = rawSlides;
+  prevParsedSlides = slides;
   return { slides, frontmatter };
 }
 

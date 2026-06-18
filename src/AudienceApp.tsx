@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { emit, emitTo, listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { SlideRenderer } from './components/preview/SlideRenderer';
 import type { Slide, AspectRatio } from './engine/types';
 import type { Theme } from './engine/theme';
+import { registerBundledFonts, registerCachedFont } from './engine/bundledFonts';
 import './styles/global.css';
 
 export interface PresentInitPayload {
@@ -55,7 +57,34 @@ export function AudienceApp() {
 
     setup();
     return () => { unlistenInit?.(); unlistenNav?.(); unlistenExit?.(); unlistenLaser?.(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Register the active theme's bundled/remote fonts in *this* window's document.
+  // App.tsx does this for the main window, but that document is entirely separate
+  // from this one — without this, a theme using a custom font would render
+  // correctly for the presenter and silently fall back to a generic font on the
+  // audience-facing screen, the one piece of hardware the audience actually sees.
+  useEffect(() => {
+    if (initData?.theme.bundledFonts?.length) {
+      registerBundledFonts(initData.theme.bundledFonts);
+    }
+  }, [initData?.theme.bundledFonts]);
+
+  useEffect(() => {
+    const fonts = initData?.theme.remoteFonts;
+    if (!fonts?.length) return;
+    for (const font of fonts) {
+      invoke<string>('download_and_cache_font', { url: font.url, sha256: font.sha256 })
+        .then((cachedPath) => {
+          registerCachedFont(font.family, cachedPath, font.weight, font.style, font.sha256, convertFileSrc);
+        })
+        .catch((err) => {
+          console.warn(`[kova] remote font "${font.family}" failed: ${err}`);
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initData?.theme.remoteFonts]);
 
   // Forward keyboard events to the main presenter window so navigation works
   // even when the compositor gave OS focus to the audience window instead.

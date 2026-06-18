@@ -11,6 +11,7 @@ import type { Theme } from '../../engine/theme';
 import { themeToVars, resolveTemplate, DEFAULT_THEME, hexToHsl, hslToHex, defaultChartPalette, isLightHex } from '../../engine/theme';
 import './SlideRenderer.css';
 import { mermaidSvgCache } from '../../engine/export/mermaidSvgCache';
+import { queuedMermaidRender } from '../../engine/export/mermaidRenderQueue';
 
 mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict' });
 
@@ -858,7 +859,7 @@ function MermaidDiagram({ value }: { value: string }) {
     const sanitized = sanitizeMermaidSource(value);
     const src = sanitized.trimStart().startsWith('%%{') ? sanitized : mermaidInit + sanitized;
     const renderId = `${baseId}-${++counter.current}`;
-    mermaid.render(renderId, src)
+    queuedMermaidRender(renderId, src)
       .then(({ svg: out }: { svg: string }) => {
         if (!cancelled) {
           // Cache raw SVG for the PPTX exporter before rewriting dimensions.
