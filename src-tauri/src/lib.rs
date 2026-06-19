@@ -35,6 +35,28 @@ pub fn run() {
         .manage(AppState {
             watch: Mutex::new(WatchState { current_file: None, watcher: None }),
             exit_confirmed: AtomicBool::new(false),
+            pending_open: Mutex::new(Vec::new()),
+        })
+        .setup(|app| {
+            // macOS: titleBarStyle Overlay still draws the window title text next
+            // to the traffic lights, and setTitle("") doesn't clear it. Hide it at
+            // the NSWindow level so only the in-app centered doctitle shows.
+            #[cfg(target_os = "macos")]
+            {
+                use objc2_app_kit::{NSWindow, NSWindowTitleVisibility};
+                if let Some(win) = app.get_webview_window("main") {
+                    if let Ok(ptr) = win.ns_window() {
+                        let ns: &NSWindow = unsafe { &*(ptr as *const NSWindow) };
+                        unsafe {
+                            ns.setTitleVisibility(NSWindowTitleVisibility::Hidden);
+                            ns.setTitlebarAppearsTransparent(true);
+                        }
+                    }
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = app;
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::read_file,
@@ -63,6 +85,7 @@ pub fn run() {
             commands::read_clipboard_image,
             commands::fetch_url_b64,
             commands::confirm_exit,
+            commands::take_pending_open,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -74,6 +97,23 @@ pub fn run() {
     // an app-level quit. Intercept here so unsaved changes get the same
     // confirmation prompt regardless of which gesture the user used to quit.
     app.run(move |app_handle, event| {
+        // macOS file association: double-click / "Open With" delivers paths here.
+        // Emit for a running app; also buffer so a launch-with-file isn't lost
+        // before the frontend mounts its listener (drained via take_pending_open).
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Opened { urls } = &event {
+            let paths: Vec<String> = urls
+                .iter()
+                .filter_map(|u| u.to_file_path().ok())
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect();
+            if !paths.is_empty() {
+                let state = app_handle.state::<AppState>();
+                state.pending_open.lock().unwrap().extend(paths.iter().cloned());
+                let _ = app_handle.emit("open-file", paths);
+            }
+            return;
+        }
         if let tauri::RunEvent::ExitRequested { api, .. } = event {
             let state = app_handle.state::<AppState>();
             if state.exit_confirmed.load(Ordering::SeqCst) {

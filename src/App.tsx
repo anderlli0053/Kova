@@ -21,6 +21,9 @@ import { MissingThemeBanner } from './components/MissingThemeBanner';
 import { loadSettings, saveSettings, EDITOR_FONT_OPTIONS } from './store/settings';
 import type { AppSettings } from './store/settings';
 import { loadLastSession, saveLastSession } from './store/lastSession';
+import { loadRecentFiles, addRecentFile, clearRecentFiles } from './store/recentFiles';
+import { buildMacMenu } from './macMenu';
+import type { MacMenuHandlers } from './macMenu';
 import { loadKeybindings, matchShortcut, getCombo, formatCombo } from './engine/keybindings';
 import type { Keybindings } from './engine/keybindings';
 
@@ -98,6 +101,7 @@ export default function App() {
   const [showThemeLibrary, setShowThemeMarketplace] = useState(false);
   const [showImport, setShowImport]       = useState(false);
   const [showInspector, setShowInspector] = useState(true);
+  const [recents, setRecents] = useState<string[]>(() => loadRecentFiles());
   const [presenterMode, setPresenterMode] = useState(false);
   const [confirmCloseAction, setConfirmCloseAction] = useState<(() => void) | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<string | null>(null);
@@ -343,7 +347,9 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally runs once on mount
 
-  // Window title
+  // Window title — used by the taskbar/switcher/Mission Control. On macOS the
+  // title text is hidden at the NSWindow level (see lib.rs setup) so it doesn't
+  // duplicate the in-app centered doctitle next to the traffic lights.
   useEffect(() => {
     const name = frontmatter.title ?? filePath?.split(/[\\/]/).pop() ?? 'Kova';
     getCurrentWindow().setTitle(isDirty ? `${name} • — Kova` : `${name} — Kova`).catch(() => {});
@@ -742,6 +748,11 @@ export default function App() {
     saveLastSession(filePath ? { path: filePath, slideIndex: safeSlideIndex } : null);
   }, [filePath, safeSlideIndex]);
 
+  // Maintain the "Open Recent" list whenever a file becomes the open document.
+  useEffect(() => {
+    if (filePath) setRecents(addRecentFile(filePath));
+  }, [filePath]);
+
   const handleMarkdownDrop = useCallback((path: string) => {
     const doOpen = async () => {
       try {
@@ -1051,6 +1062,62 @@ export default function App() {
   const handleSaveRef = useRef(handleSave);
   handleSaveRef.current = handleSave;
 
+  // ── macOS native menu bar ──────────────────────────────────────────────────
+  // Latest menu actions, refreshed every render. The native menu is rebuilt only
+  // when `recents` changes, so its items delegate through this ref (below) to
+  // always run current logic without rebuilding on every keystroke.
+  const menuHandlersRef = useRef<MacMenuHandlers>({} as MacMenuHandlers);
+  menuHandlersRef.current = {
+    newFile: handleNewFile,
+    openFile: handleOpenFile,
+    openRecent: handleMarkdownDrop,
+    clearRecent: () => { clearRecentFiles(); setRecents([]); },
+    save: handleSave,
+    saveAs: () => { void handleSaveAs(); },
+    import: () => guardDirty(() => setShowImport(true)),
+    export: handleExport,
+    exportPdf: handleExportPdf,
+    print: handlePrint,
+    present: () => { void handlePresentEnter(); },
+    toggleInspector: () => setShowInspector((v) => !v),
+    openSettings: () => setShowSettings(true),
+  };
+  const stableMenuHandlers = useRef<MacMenuHandlers>({
+    newFile: () => menuHandlersRef.current.newFile(),
+    openFile: () => menuHandlersRef.current.openFile(),
+    openRecent: (p) => menuHandlersRef.current.openRecent(p),
+    clearRecent: () => menuHandlersRef.current.clearRecent(),
+    save: () => menuHandlersRef.current.save(),
+    saveAs: () => menuHandlersRef.current.saveAs(),
+    import: () => menuHandlersRef.current.import(),
+    export: () => menuHandlersRef.current.export(),
+    exportPdf: () => menuHandlersRef.current.exportPdf(),
+    print: () => menuHandlersRef.current.print(),
+    present: () => menuHandlersRef.current.present(),
+    toggleInspector: () => menuHandlersRef.current.toggleInspector(),
+    openSettings: () => menuHandlersRef.current.openSettings(),
+  }).current;
+
+  useEffect(() => {
+    if (!isMac) return;
+    void buildMacMenu(stableMenuHandlers, recents);
+  }, [recents, stableMenuHandlers]);
+
+  // macOS file association: open files delivered via double-click / "Open With".
+  // Drain any that arrived before mount (launch-with-file), then listen for live
+  // opens. ponytail: opens the first path only — single-window editor, no tabs.
+  useEffect(() => {
+    if (!isMac) return;
+    invoke<string[]>('take_pending_open')
+      .then((paths) => { if (paths[0]) handleMarkdownDrop(paths[0]); })
+      .catch(() => {});
+    const un = listen<string[]>('open-file', (e) => {
+      const p = e.payload?.[0];
+      if (p) handleMarkdownDrop(p);
+    });
+    return () => { un.then((f) => f()); };
+  }, [handleMarkdownDrop]);
+
   // Autosave — only when enabled, a file path exists, and there are unsaved changes.
   // Deliberately excludes `handleSave` from the dependency array: if it were
   // included, the timer would be torn down and restarted on every keystroke
@@ -1195,35 +1262,11 @@ export default function App() {
         />
       )}
       <div className="app-toolbar">
-        {isMac && (
-          <div className="wm-controls wm-controls--mac">
-            <button
-              className="wm-btn wm-btn--close"
-              onMouseDown={(e) => { e.preventDefault(); guardDirty(actuallyCloseWindow); }}
-              title="Close"
-            >
-              <svg width="11" height="11" viewBox="0 0 11 11">
-                <line x1="1" y1="1" x2="10" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <line x1="10" y1="1" x2="1" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-            <button
-              className="wm-btn"
-              onMouseDown={(e) => { e.preventDefault(); getCurrentWindow().minimize(); }}
-              title="Minimise"
-            >
-              <svg width="12" height="2" viewBox="0 0 12 2"><rect width="12" height="2" rx="1" fill="currentColor"/></svg>
-            </button>
-            <button
-              className="wm-btn"
-              onMouseDown={(e) => { e.preventDefault(); getCurrentWindow().toggleMaximize(); }}
-              title="Maximise / Restore"
-            >
-              <svg width="11" height="11" viewBox="0 0 11 11"><rect x="1" y="1" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg>
-            </button>
-          </div>
-        )}
-        <div className="btn-group" ref={fileMenuRef}>
+        {/* macOS uses native traffic lights (titleBarStyle: Overlay) + the native
+            menu bar, so reserve a draggable strip for the lights and drop the
+            custom window buttons + in-window File/Edit menus here. */}
+        {isMac && <div className="mac-traffic-pad" data-tauri-drag-region />}
+        {!isMac && <div className="btn-group" ref={fileMenuRef}>
           <button className="btn" onClick={() => setFileMenuOpen((o) => !o)}>
             File
           </button>
@@ -1264,8 +1307,8 @@ export default function App() {
               </button>
             </div>
           )}
-        </div>
-        <div className="btn-group" ref={editMenuRef}>
+        </div>}
+        {!isMac && <div className="btn-group" ref={editMenuRef}>
           <button className="btn" onClick={() => setEditMenuOpen((o) => !o)}>
             Edit
           </button>
@@ -1293,7 +1336,7 @@ export default function App() {
               </button>
             </div>
           )}
-        </div>
+        </div>}
         <div className="toolbar-spacer" data-tauri-drag-region />
         {isRenaming ? (
           <input

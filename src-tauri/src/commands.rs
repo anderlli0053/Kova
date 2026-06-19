@@ -424,6 +424,16 @@ pub struct AppState {
     /// `RunEvent::ExitRequested` handler in lib.rs so the retried `app.exit()`
     /// below isn't intercepted a second time.
     pub exit_confirmed: std::sync::atomic::AtomicBool,
+    /// File paths from macOS "Open With" / double-click that arrived (via
+    /// `RunEvent::Opened`) before the frontend mounted its listener. Drained
+    /// once on startup by `take_pending_open`.
+    pub pending_open: Mutex<Vec<String>>,
+}
+
+/// Drain file paths that macOS delivered before the webview was ready to listen.
+#[tauri::command]
+pub fn take_pending_open(state: State<'_, AppState>) -> Vec<String> {
+    std::mem::take(&mut *state.pending_open.lock().unwrap())
 }
 
 #[tauri::command]
