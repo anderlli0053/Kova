@@ -89,6 +89,9 @@ export default function App() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [focusMode, setFocusMode]         = useState(false);
   const [presentMode, setPresentMode]     = useState(false);
+  // Index into visibleSlides (hidden slides skipped) while presenting — kept
+  // separate from currentSlideIndex (which indexes the full editor deck).
+  const [presentIndex, setPresentIndex]   = useState(0);
   const [settings, setSettings]           = useState<AppSettings>(loadSettings);
   const [showSettings, setShowSettings]   = useState(false);
   const [settingsScrollToUpdates, setSettingsScrollToUpdates] = useState(false);
@@ -268,6 +271,13 @@ export default function App() {
     ? Math.min(currentSlideIndex, slides.length - 1)
     : 0;
 
+  // Deck used for presentation + export — hidden slides removed. Reference-equal
+  // to entries in `slides`, so index translation uses indexOf/indexOf.
+  const visibleSlides = useMemo(() => slides.filter((s) => !s.hidden), [slides]);
+  const safePresentIndex = visibleSlides.length > 0
+    ? Math.min(presentIndex, visibleSlides.length - 1)
+    : 0;
+
   const aspectRatio = useMemo(
     () => parseAspectRatio(frontmatter.aspect_ratio as string | undefined),
     [frontmatter.aspect_ratio],
@@ -432,16 +442,21 @@ export default function App() {
     } catch { /* ignore */ }
     setPresentMode(false);
     setPresenterMode(false);
+    // Land the editor on whatever slide we exited on (translate visible→full).
+    const full = slides.indexOf(visibleSlides[safePresentIndex]);
+    if (full >= 0) setCurrentSlideIndex(full);
     await getCurrentWindow().setFullscreen(false).catch(() => {});
     isExitingRef.current = false;
-  }, []);
+  }, [slides, visibleSlides, safePresentIndex]);
 
   const handlePresentEnter = useCallback(async (e?: React.MouseEvent) => {
-    if (slides.length === 0) return;
+    if (visibleSlides.length === 0) return;
     isExitingRef.current = false;
     const sessionId = ++presentSessionRef.current;
-    const startIndex = e?.altKey ? safeSlideIndex : 0;
-    if (!e?.altKey) setCurrentSlideIndex(0);
+    // "Present from current" (alt) maps the editor's slide into visible space;
+    // if that slide is hidden, indexOf is -1 → start from the first visible.
+    const startIndex = e?.altKey ? Math.max(0, visibleSlides.indexOf(slides[safeSlideIndex])) : 0;
+    setPresentIndex(startIndex);
 
     // Resolve 'auto': detect monitors first, then pick mode.
     // Use currentMonitor() (not primaryMonitor()) to find the monitor Kova is
@@ -474,7 +489,7 @@ export default function App() {
 
       if (external) {
         const initPayload: PresentInitPayload = {
-          slides,
+          slides: visibleSlides,
           theme: activeTheme,
           index: startIndex,
           aspectRatio,
@@ -564,7 +579,7 @@ export default function App() {
 
     setPresentMode(true);
     await getCurrentWindow().setFullscreen(true).catch(() => {});
-  }, [slides, safeSlideIndex, activeTheme, aspectRatio, frontmatter.title, settings.presentationMode]);
+  }, [slides, visibleSlides, safeSlideIndex, activeTheme, aspectRatio, frontmatter.title, settings.presentationMode]);
 
   // Prevent display sleep while presenting; release on exit.
   // Covers all exit paths (normal, error, external window close).
@@ -638,8 +653,8 @@ export default function App() {
   // PresentationOverlay drives navigation but never emits present:navigate.
   useEffect(() => {
     if (!presentMode) return;
-    emitTo('audience', 'present:navigate', { index: safeSlideIndex }).catch(() => {});
-  }, [presentMode, safeSlideIndex]);
+    emitTo('audience', 'present:navigate', { index: safePresentIndex }).catch(() => {});
+  }, [presentMode, safePresentIndex]);
 
   const handleThemeSelect = useCallback((id: string) => {
     setActiveThemeId(id);
@@ -876,9 +891,9 @@ export default function App() {
   }, [filePath, content, buildSaveContent]);
 
   const handleExport = useCallback(async () => {
-    if (slides.length === 0) return;
+    if (visibleSlides.length === 0) return;
     try {
-      const { base64, warnings } = await exportToPptx(slides, frontmatter, activeTheme);
+      const { base64, warnings } = await exportToPptx(visibleSlides, frontmatter, activeTheme);
       const defaultPath = filePath
         ? filePath.replace(/\.(md|markdown)$/i, '.pptx')
         : 'presentation.pptx';
@@ -896,10 +911,10 @@ export default function App() {
       console.error('Export failed:', err);
       window.alert(`PPTX export failed: ${String(err)}`);
     }
-  }, [slides, frontmatter, activeTheme, filePath]);
+  }, [visibleSlides, frontmatter, activeTheme, filePath]);
 
   const handleExportPdf = useCallback(async () => {
-    if (slides.length === 0) return;
+    if (visibleSlides.length === 0) return;
     const defaultPath = filePath
       ? filePath.replace(/\.(md|markdown)$/i, '.pdf')
       : 'presentation.pdf';
@@ -912,18 +927,18 @@ export default function App() {
     pdfSlideRefs.current.clear();
     await new Promise<void>(resolve => {
       pdfExportResolveRef.current = resolve;
-      setPdfExportContext({ slides: [...slides], savePath });
+      setPdfExportContext({ slides: [...visibleSlides], savePath });
     });
-  }, [slides, filePath]);
+  }, [visibleSlides, filePath]);
 
   const handlePrint = useCallback(async () => {
-    if (slides.length === 0) return;
+    if (visibleSlides.length === 0) return;
     printSlideRefs.current.clear();
     await new Promise<void>(resolve => {
       printResolveRef.current = resolve;
-      setPrintContext({ slides: [...slides] });
+      setPrintContext({ slides: [...visibleSlides] });
     });
-  }, [slides]);
+  }, [visibleSlides]);
 
   const handleCopyWithAssets = useCallback(async () => {
     if (!filePath) return;
@@ -986,6 +1001,25 @@ export default function App() {
     setIsDirty(true);
     setCurrentSlideIndex(toIndex);
     setTimeout(() => editorRef.current?.scrollToSlide(toIndex), 50);
+  }, []);
+
+  const handleToggleHidden = useCallback((index: number) => {
+    setContent((prev) => {
+      const fmMatch = prev.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+      const fmBlock = fmMatch ? fmMatch[0] : '';
+      const body = prev.slice(fmBlock.length);
+      // Edit ONLY the target segment; keep every other segment + the `---`
+      // delimiters byte-identical so the parser's positional cache still hits
+      // for unchanged slides (no thumbnail remount → scroll position preserved).
+      const segments = body.split(/^---$/m);
+      if (index < 0 || index >= segments.length) return prev;
+      const seg = segments[index];
+      segments[index] = /<!--\s*hidden\s*-->/.test(seg)
+        ? seg.replace(/[ \t]*<!--\s*hidden\s*-->[ \t]*\r?\n?/, '')
+        : seg.replace(/^(\s*)/, '$1<!-- hidden -->\n');
+      return fmBlock + segments.join('---');
+    });
+    setIsDirty(true);
   }, []);
 
   const handleWarn = useCallback((msg: string) => {
@@ -1142,20 +1176,20 @@ export default function App() {
       )}
       {presentMode && (
         <PresentationOverlay
-          slides={slides}
-          currentIndex={safeSlideIndex}
+          slides={visibleSlides}
+          currentIndex={safePresentIndex}
           theme={activeTheme}
           docTitle={frontmatter.title}
           aspectRatio={aspectRatio}
           laserColor={settings.laserColor}
-          onNavigate={setCurrentSlideIndex}
+          onNavigate={setPresentIndex}
           onExit={handlePresentExit}
         />
       )}
       {presenterMode && (
         <PresenterOverlay
-          slides={slides}
-          currentIndex={safeSlideIndex}
+          slides={visibleSlides}
+          currentIndex={safePresentIndex}
           theme={activeTheme}
           docTitle={frontmatter.title}
           aspectRatio={aspectRatio}
@@ -1163,7 +1197,7 @@ export default function App() {
           showTimer={settings.presenterShowTimer}
           notesFontSize={settings.presenterNotesFontSize}
           laserColor={settings.laserColor}
-          onNavigate={setCurrentSlideIndex}
+          onNavigate={setPresentIndex}
           onExit={handlePresentExit}
         />
       )}
@@ -1368,6 +1402,7 @@ export default function App() {
               currentIndex={safeSlideIndex}
               onSelect={handleThumbnailSelect}
               onReorder={handleSlideReorder}
+              onToggleHidden={handleToggleHidden}
               theme={activeTheme}
               docTitle={frontmatter.title}
               aspectRatio={aspectRatio}

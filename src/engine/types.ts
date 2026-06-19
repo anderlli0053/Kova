@@ -42,6 +42,7 @@ export interface Slide {
   speakerNotes: string;
   layout: LayoutType;
   layoutOverride?: LayoutType;
+  hidden: boolean;        // skipped in presentation + export; set via <!-- hidden --> marker
 }
 
 export interface AspectRatio { w: number; h: number }

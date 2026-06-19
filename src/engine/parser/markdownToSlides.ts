@@ -49,6 +49,8 @@ function parseSlide(raw: string, index: number): Slide {
     ? (layoutOverrideMatch[1] as LayoutType)
     : undefined;
 
+  const hidden = /<!--\s*hidden\s*-->/.test(raw);
+
   // Preprocess before speaker-notes extraction so ??? inside custom URLs is not
   // misinterpreted as speaker-note markers. Custom elements become inline HTML
   // comment placeholders so remark preserves their position in the element list.
@@ -60,7 +62,7 @@ function parseSlide(raw: string, index: number): Slide {
 
   const layout = layoutOverride ?? detectLayout(elements, titleLevel, !!title);
 
-  return { index, raw, title, titleLevel, elements, speakerNotes: notes, layout, layoutOverride };
+  return { index, raw, title, titleLevel, elements, speakerNotes: notes, layout, layoutOverride, hidden };
 }
 
 // ── Custom syntax pre-processor ──────────────────────────────────────────────
@@ -114,8 +116,9 @@ function preprocess(content: string): PreprocessResult {
       continue;
     }
 
-    // Strip layout override comments (already captured above)
+    // Strip layout override + hidden comments (already captured above)
     if (/^<!--\s*layout:/.test(t)) continue;
+    if (/^<!--\s*hidden\s*-->$/.test(t)) continue;
 
     // Expand single-line $$...$$ to multi-line so remark-math treats it as a block
     const dm = t.match(DISPLAY_MATH_RE);

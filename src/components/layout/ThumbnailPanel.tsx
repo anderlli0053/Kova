@@ -9,6 +9,7 @@ interface Props {
   currentIndex: number;
   onSelect: (index: number) => void;
   onReorder?: (fromIndex: number, toIndex: number) => void;
+  onToggleHidden?: (index: number) => void;
   theme?: Theme;
   docTitle?: string;
   aspectRatio?: AspectRatio;
@@ -17,7 +18,7 @@ interface Props {
 const SLIDE_W = 960;
 const THUMB_W = 140;
 
-export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, theme = DEFAULT_THEME, docTitle, aspectRatio = { w: 16, h: 9 } }: Props) {
+export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onToggleHidden, theme = DEFAULT_THEME, docTitle, aspectRatio = { w: 16, h: 9 } }: Props) {
   const slideH = Math.round(SLIDE_W * aspectRatio.h / aspectRatio.w);
 
   // Observe the outer panel div (no overflow) so a scrollbar appearing in the
@@ -26,6 +27,7 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, them
   const [scale, setScale] = useState(THUMB_W / SLIDE_W);
   const [dragFromIndex, setDragFromIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [menu, setMenu] = useState<{ index: number; x: number; y: number } | null>(null);
 
   // Mutable drag state for use inside stable event listeners (avoids stale closures).
   const dragRef     = useRef<{ fromIndex: number; overIndex: number | null } | null>(null);
@@ -162,6 +164,29 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, them
     document.body.style.userSelect = 'none';
   }, [onReorder]);
 
+  const handleThumbContextMenu = useCallback((index: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    setMenu({ index, x: e.clientX, y: e.clientY });
+  }, []);
+
+  // Dismiss the context menu on any outside interaction.
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('mousedown', close);
+    window.addEventListener('resize', close);
+    window.addEventListener('keydown', onKey);
+    const sc = scrollRef.current;
+    sc?.addEventListener('scroll', close);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('keydown', onKey);
+      sc?.removeEventListener('scroll', close);
+    };
+  }, [menu]);
+
   const thumbH = Math.round(slideH * scale);
 
   return (
@@ -187,8 +212,11 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, them
                   isActive={i === currentIndex}
                   isDragSource={dragFromIndex === i}
                   canDrag={Boolean(onReorder)}
+                  isHidden={slide.hidden}
                   onSelect={onSelect}
+                  onToggleHidden={onToggleHidden}
                   onDragStart={handleThumbMouseDown}
+                  onContextMenu={handleThumbContextMenu}
                   theme={theme}
                   docTitle={docTitle}
                   scale={scale}
@@ -201,7 +229,56 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, them
           })
         )}
       </div>
+
+      {menu && (
+        // ponytail: fixed at cursor, may clip near the viewport edge; add flip
+        // logic only if users actually hit it.
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed', left: menu.x, top: menu.y, zIndex: 1000,
+            minWidth: 140, padding: 4, borderRadius: 6,
+            background: 'var(--bg-panel, #2a2a2a)', border: '1px solid var(--border)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)', fontSize: 12,
+          }}
+        >
+          <MenuItem
+            label="Move up"
+            disabled={!onReorder || menu.index === 0}
+            onClick={() => { onReorder?.(menu.index, menu.index - 1); setMenu(null); }}
+          />
+          <MenuItem
+            label="Move down"
+            disabled={!onReorder || menu.index === slides.length - 1}
+            onClick={() => { onReorder?.(menu.index, menu.index + 1); setMenu(null); }}
+          />
+          <MenuItem
+            label={slides[menu.index]?.hidden ? 'Show slide' : 'Hide slide'}
+            disabled={!onToggleHidden}
+            onClick={() => { onToggleHidden?.(menu.index); setMenu(null); }}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+function MenuItem({ label, disabled, onClick }: { label: string; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        display: 'block', width: '100%', textAlign: 'left',
+        padding: '5px 8px', border: 'none', borderRadius: 4,
+        background: 'transparent', color: 'var(--text)', cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
+      }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--accent)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -223,8 +300,11 @@ interface ThumbnailProps {
   isActive: boolean;
   isDragSource: boolean;
   canDrag: boolean;
+  isHidden: boolean;
   onSelect: (index: number) => void;
+  onToggleHidden?: (index: number) => void;
   onDragStart: (index: number, e: React.MouseEvent) => void;
+  onContextMenu: (index: number, e: React.MouseEvent) => void;
   theme: Theme;
   docTitle?: string;
   slideH: number;
@@ -239,7 +319,7 @@ interface ThumbnailProps {
 // keystroke. `onSelect`/`onDragStart` are forwarded as stable function
 // references (bound internally below) rather than passed as pre-bound
 // closures, specifically so they don't defeat this memoization.
-const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, canDrag, onSelect, onDragStart, theme, docTitle, slideH, scale, thumbH }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, canDrag, isHidden, onSelect, onToggleHidden, onDragStart, onContextMenu, theme, docTitle, slideH, scale, thumbH }: ThumbnailProps) {
   const thumbRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -252,6 +332,7 @@ const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive,
       data-slide-index={index}
       onClick={() => onSelect(index)}
       onMouseDown={(e) => onDragStart(index, e)}
+      onContextMenu={(e) => onContextMenu(index, e)}
       style={{
         marginBottom: 8,
         cursor: canDrag ? 'grab' : 'pointer',
@@ -260,10 +341,26 @@ const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive,
         overflow: 'hidden',
         position: 'relative',
         userSelect: 'none',
-        opacity: isDragSource ? 0.4 : 1,
+        opacity: isDragSource ? 0.4 : isHidden ? 0.45 : 1,
         transition: 'opacity 0.1s',
       }}
     >
+      {onToggleHidden && (
+        <button
+          title={isHidden ? 'Show slide in presentation/export' : 'Hide slide from presentation/export'}
+          onClick={(e) => { e.stopPropagation(); onToggleHidden(index); }}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', top: 4, right: 5, zIndex: 1,
+            width: 20, height: 20, padding: 0, lineHeight: '20px',
+            fontSize: 11, textAlign: 'center', cursor: 'pointer',
+            border: 'none', borderRadius: 3, color: '#fff',
+            background: 'rgba(0,0,0,0.55)',
+          }}
+        >
+          {isHidden ? '🚫' : '👁'}
+        </button>
+      )}
       {/* Scaled slide render */}
       <div
         style={{ width: '100%', height: thumbH, overflow: 'hidden', position: 'relative' }}

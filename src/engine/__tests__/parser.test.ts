@@ -331,6 +331,15 @@ describe('layout override comment', () => {
   });
 });
 
+describe('hidden slide marker', () => {
+  it('<!-- hidden --> sets hidden true and is not a visible element', () => {
+    const { slides } = parseDocument(doc('## A\n\n---\n\n<!-- hidden -->\n\n## B\n\n- Item\n'));
+    expect(slides.map((s) => s.hidden)).toEqual([false, true]);
+    const paras = slides[1].elements.filter((e) => e.type === 'paragraph');
+    expect(paras.every((p) => p.type === 'paragraph' && !p.text.includes('hidden'))).toBe(true);
+  });
+});
+
 // ── Full document round-trip ──────────────────────────────────────────────────
 
 describe('full document', () => {
