@@ -27,6 +27,7 @@ import type { Keybindings } from './engine/keybindings';
 import { parseDocument } from './engine/parser/markdownToSlides';
 import { extractFrontmatter, patchFrontmatter } from './engine/parser/frontmatter';
 import { fetchUpdate } from './engine/updater';
+import { normalizePath } from './engine/resolvePath';
 import { exportToPptx } from './engine/export/exportPptx';
 import { exportToPdf, printPresentation } from './engine/export/exportPdf';
 import { SlideRenderer } from './components/preview/SlideRenderer';
@@ -49,8 +50,7 @@ function resolveImageSrc(src: string, docDir: string): string {
   if (p.startsWith('/') || /^[A-Za-z]:[/\\]/.test(p)) return convertFileSrc(p);
   // Relative path — only resolvable when we know the document location.
   if (!docDir) return p;
-  const sep = docDir.includes('\\') ? '\\' : '/';
-  return convertFileSrc(docDir + (docDir.endsWith(sep) ? '' : sep) + p);
+  return convertFileSrc(normalizePath(docDir, p));
 }
 
 function resolveHtmlSrcs(html: string, docDir: string): string {
