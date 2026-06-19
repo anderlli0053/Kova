@@ -572,12 +572,6 @@ export default function App() {
     invoke('set_wake_lock', { active: presentMode || presenterMode }).catch(() => {});
   }, [presentMode, presenterMode]);
 
-  // Set once we've explicitly decided to let a close-requested event through
-  // (after the user confirmed, or there was nothing to confirm), so the
-  // `getCurrentWindow().close()` call below doesn't re-enter onCloseRequested
-  // and prompt a second time.
-  const bypassCloseConfirmRef = useRef(false);
-
   const actuallyCloseWindow = useCallback(async () => {
     // Unconditional: guarantees the macOS `caffeinate` child (and the Linux
     // DBus screensaver inhibit) are released on every normal quit path, not
@@ -585,12 +579,9 @@ export default function App() {
     // first. A crash/kill -9 can't be intercepted from user space — this only
     // covers the normal "ask before quit" paths below.
     await invoke('set_wake_lock', { active: false }).catch(() => {});
-    bypassCloseConfirmRef.current = true;
-    try {
-      await getCurrentWindow().close();
-    } finally {
-      bypassCloseConfirmRef.current = false;
-    }
+    // destroy() bypasses onCloseRequested (unlike close(), which emits the
+    // close-requested event and would re-trigger the confirmation dialog).
+    await getCurrentWindow().destroy();
   }, []);
 
   const actuallyExitApp = useCallback(async () => {
@@ -606,7 +597,6 @@ export default function App() {
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow().onCloseRequested((event) => {
-      if (bypassCloseConfirmRef.current) return; // already confirmed — let this one through
       event.preventDefault();
       guardDirty(actuallyCloseWindow);
     }).then((fn) => { unlisten = fn; });
