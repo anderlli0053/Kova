@@ -352,13 +352,23 @@ const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive,
           onMouseDown={(e) => e.stopPropagation()}
           style={{
             position: 'absolute', top: 4, right: 5, zIndex: 1,
-            width: 20, height: 20, padding: 0, lineHeight: '20px',
-            fontSize: 11, textAlign: 'center', cursor: 'pointer',
+            width: 20, height: 20, padding: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
             border: 'none', borderRadius: 3, color: '#fff',
             background: 'rgba(0,0,0,0.55)',
           }}
         >
-          {isHidden ? '🚫' : '👁'}
+          {isHidden ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          )}
         </button>
       )}
       {/* Scaled slide render */}
