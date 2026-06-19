@@ -17,6 +17,7 @@ import type { PresentInitPayload } from './AudienceApp';
 import { SettingsModal } from './components/SettingsModal';
 import { ThemeLibraryModal } from './components/inspector/ThemeLibraryModal';
 import { ImportPptxModal } from './components/ImportPptxModal';
+import { ImportUrlModal } from './components/ImportUrlModal';
 import { MissingThemeBanner } from './components/MissingThemeBanner';
 import { loadSettings, saveSettings, EDITOR_FONT_OPTIONS } from './store/settings';
 import type { AppSettings } from './store/settings';
@@ -100,6 +101,7 @@ export default function App() {
   const [settingsScrollToUpdates, setSettingsScrollToUpdates] = useState(false);
   const [showThemeLibrary, setShowThemeMarketplace] = useState(false);
   const [showImport, setShowImport]       = useState(false);
+  const [showImportUrl, setShowImportUrl] = useState(false);
   const [showInspector, setShowInspector] = useState(true);
   const [recents, setRecents] = useState<string[]>(() => loadRecentFiles());
   const [presenterMode, setPresenterMode] = useState(false);
@@ -812,6 +814,12 @@ export default function App() {
     await applyFileContent(markdown, savedPath);
   }, [applyFileContent]);
 
+  const handleImportFromUrl = useCallback(async (text: string) => {
+    setShowImportUrl(false);
+    await invoke('stop_watching').catch(() => {});
+    await applyFileContent(text, '');
+  }, [applyFileContent]);
+
   const handleOpenFile = useCallback(() => {
     guardDirty(async () => { try {
       const selected = await open({
@@ -1075,6 +1083,7 @@ export default function App() {
     save: handleSave,
     saveAs: () => { void handleSaveAs(); },
     import: () => guardDirty(() => setShowImport(true)),
+    importUrl: () => guardDirty(() => setShowImportUrl(true)),
     export: handleExport,
     exportPdf: handleExportPdf,
     print: handlePrint,
@@ -1090,6 +1099,7 @@ export default function App() {
     save: () => menuHandlersRef.current.save(),
     saveAs: () => menuHandlersRef.current.saveAs(),
     import: () => menuHandlersRef.current.import(),
+    importUrl: () => menuHandlersRef.current.importUrl(),
     export: () => menuHandlersRef.current.export(),
     exportPdf: () => menuHandlersRef.current.exportPdf(),
     print: () => menuHandlersRef.current.print(),
@@ -1281,6 +1291,9 @@ export default function App() {
               </button>
               <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImport(true)); }}>
                 Import from PowerPoint…
+              </button>
+              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImportUrl(true)); }}>
+                Import from URL…
               </button>
               <div className="btn-group-menu-separator" />
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" disabled={!filePath || !isDirty} onClick={() => { setFileMenuOpen(false); handleSave(); }}>
@@ -1524,6 +1537,13 @@ export default function App() {
         <ImportPptxModal
           onImported={handleImportComplete}
           onClose={() => setShowImport(false)}
+        />
+      )}
+
+      {showImportUrl && (
+        <ImportUrlModal
+          onImported={handleImportFromUrl}
+          onClose={() => setShowImportUrl(false)}
         />
       )}
 

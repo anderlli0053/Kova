@@ -987,6 +987,25 @@ pub async fn fetch_url_b64(url: String) -> Result<(String, String), String> {
     Ok((base64::engine::general_purpose::STANDARD.encode(&bytes), mime))
 }
 
+/// Fetch a URL and return its body as UTF-8 text. Used for "Import from URL"
+/// to bypass webview CSP connect-src restrictions.
+#[tauri::command]
+pub async fn fetch_url_text(url: String) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("client error: {e}"))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("fetch failed: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("fetch failed: HTTP {}", resp.status()));
+    }
+    resp.text().await.map_err(|e| format!("read failed: {e}"))
+}
+
 fn collect_system_fonts() -> Vec<String> {
     #[cfg(target_os = "linux")]
     {

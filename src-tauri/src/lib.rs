@@ -84,6 +84,7 @@ pub fn run() {
             commands::set_wake_lock,
             commands::read_clipboard_image,
             commands::fetch_url_b64,
+            commands::fetch_url_text,
             commands::confirm_exit,
             commands::take_pending_open,
         ])
