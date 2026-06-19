@@ -579,9 +579,12 @@ export default function App() {
     // first. A crash/kill -9 can't be intercepted from user space — this only
     // covers the normal "ask before quit" paths below.
     await invoke('set_wake_lock', { active: false }).catch(() => {});
-    // destroy() bypasses onCloseRequested (unlike close(), which emits the
-    // close-requested event and would re-trigger the confirmation dialog).
-    await getCurrentWindow().destroy();
+    // confirm_exit sets exit_confirmed=true then calls app.exit(0). Using
+    // destroy() here instead causes a race on Linux: GTK's window teardown is
+    // async relative to Tauri's registry, so get_webview_window("main") still
+    // returns Some during ExitRequested and prevent_exit() is called — leaving
+    // the process alive with no visible window.
+    await invoke('confirm_exit').catch(() => {});
   }, []);
 
   const actuallyExitApp = useCallback(async () => {
@@ -589,11 +592,11 @@ export default function App() {
     await invoke('confirm_exit').catch(() => {});
   }, []);
 
-  // Window-level close: clicking Kova's own close button, Alt+F4, the taskbar
-  // "Close window" entry, etc. Tauri's window manager automatically calls
-  // prevent_close() for us as long as a JS listener is registered (see
-  // manager/window.rs upstream) — we still call event.preventDefault()
-  // explicitly so the contract doesn't depend on that implementation detail.
+  // OS-level close: Alt+F4, taskbar "Close window", compositor gestures, etc.
+  // Kova's own close button calls guardDirty(actuallyCloseWindow) directly so it
+  // never reaches this path. Tauri automatically calls prevent_close() while a JS
+  // listener is registered; event.preventDefault() makes that explicit so the
+  // contract doesn't depend on that implementation detail.
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow().onCloseRequested((event) => {
@@ -1162,7 +1165,7 @@ export default function App() {
           <div className="wm-controls wm-controls--mac">
             <button
               className="wm-btn wm-btn--close"
-              onMouseDown={(e) => { e.preventDefault(); getCurrentWindow().close(); }}
+              onMouseDown={(e) => { e.preventDefault(); guardDirty(actuallyCloseWindow); }}
               title="Close"
             >
               <svg width="11" height="11" viewBox="0 0 11 11">
@@ -1222,7 +1225,7 @@ export default function App() {
                 {printContext ? 'Preparing Print…' : 'Print…'}
               </button>
               <div className="btn-group-menu-separator" />
-              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); getCurrentWindow().close(); }}>
+              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(actuallyCloseWindow); }}>
                 Exit
               </button>
             </div>
@@ -1331,7 +1334,7 @@ export default function App() {
               className="wm-btn wm-btn--close"
               onMouseDown={(e) => {
                 e.preventDefault();
-                getCurrentWindow().close();
+                guardDirty(actuallyCloseWindow);
               }}
               title="Close"
             >
