@@ -128,6 +128,7 @@ export default function App() {
   const [renameValue, setRenameValue]     = useState('');
   const [resolvedUiTheme, setResolvedUiTheme] = useState<'dark' | 'light'>('dark');
   const [fileMenuOpen, setFileMenuOpen]       = useState(false);
+  const [importSubmenuOpen, setImportSubmenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const [editMenuOpen, setEditMenuOpen]       = useState(false);
   const editMenuRef = useRef<HTMLDivElement>(null);
@@ -1325,15 +1326,24 @@ export default function App() {
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setFileMenuOpen(false); handleOpenFile(); }}>
                 Open <span>{formatCombo(getCombo(keybindings.combos, 'openFile'))}</span>
               </button>
-              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImport(true)); }}>
-                Import from PowerPoint…
-              </button>
-              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImportUrl(true)); }}>
-                Import from URL…
-              </button>
-              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); handleImportMarp(); }}>
-                Import from Marp…
-              </button>
+              <div style={{ position: 'relative' }} onMouseEnter={() => setImportSubmenuOpen(true)} onMouseLeave={() => setImportSubmenuOpen(false)}>
+                <button className="btn-group-menu-item btn-group-menu-item--shortcut">
+                  Import <span>›</span>
+                </button>
+                {importSubmenuOpen && (
+                  <div className="btn-group-menu btn-group-menu--sub">
+                    <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImport(true)); }}>
+                      From PowerPoint…
+                    </button>
+                    <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImportUrl(true)); }}>
+                      From URL…
+                    </button>
+                    <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); handleImportMarp(); }}>
+                      From Marp…
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="btn-group-menu-separator" />
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" disabled={!filePath || !isDirty} onClick={() => { setFileMenuOpen(false); handleSave(); }}>
                 Save <span>{formatCombo(getCombo(keybindings.combos, 'save'))}</span>

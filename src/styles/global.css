@@ -300,6 +300,13 @@ html, body, #root {
   margin: 3px 0;
 }
 
+.btn-group-menu--sub {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: 2px;
+}
+
 /* ── Panel area ── */
 .app-panels {
   flex: 1;
