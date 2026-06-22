@@ -18,6 +18,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { ThemeLibraryModal } from './components/inspector/ThemeLibraryModal';
 import { ImportPptxModal } from './components/ImportPptxModal';
 import { ImportUrlModal } from './components/ImportUrlModal';
+import { InfoBanner } from './components/InfoBanner';
+import { isMarp, importMarp } from './engine/import/marp';
 import { MissingThemeBanner } from './components/MissingThemeBanner';
 import { loadSettings, saveSettings, EDITOR_FONT_OPTIONS } from './store/settings';
 import type { AppSettings } from './store/settings';
@@ -44,6 +46,12 @@ import type { Theme } from './engine/theme';
 import './styles/global.css';
 
 const isMac = /Mac/i.test(navigator.platform);
+
+// Parent folder of a path (handles both separators); '' if it has none.
+function dirOf(p: string): string {
+  const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+  return i >= 0 ? p.slice(0, i) : '';
+}
 
 function resolveImageSrc(src: string, docDir: string): string {
   if (/^(https?|data|asset|tauri):\/\//i.test(src)) return src;
@@ -102,6 +110,12 @@ export default function App() {
   const [showThemeLibrary, setShowThemeMarketplace] = useState(false);
   const [showImport, setShowImport]       = useState(false);
   const [showImportUrl, setShowImportUrl] = useState(false);
+  const [marpPrompt, setMarpPrompt] = useState<{ text: string; dir: string } | null>(null);
+  const [marpLoss, setMarpLoss]     = useState<number | null>(null);
+  // Source folder of an imported deck. The import lands in an untitled buffer
+  // (no filePath), but its relative image paths must still resolve against the
+  // original .md's location, so the doc-dir falls back to this when unsaved.
+  const [importDir, setImportDir]   = useState('');
   const [showInspector, setShowInspector] = useState(true);
   const [recents, setRecents] = useState<string[]>(() => loadRecentFiles());
   const [presenterMode, setPresenterMode] = useState(false);
@@ -114,6 +128,7 @@ export default function App() {
   const [renameValue, setRenameValue]     = useState('');
   const [resolvedUiTheme, setResolvedUiTheme] = useState<'dark' | 'light'>('dark');
   const [fileMenuOpen, setFileMenuOpen]       = useState(false);
+  const [importSubmenuOpen, setImportSubmenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const [editMenuOpen, setEditMenuOpen]       = useState(false);
   const editMenuRef = useRef<HTMLDivElement>(null);
@@ -239,7 +254,7 @@ export default function App() {
     const lastSlash = filePath
       ? Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
       : -1;
-    const docDir = lastSlash >= 0 ? filePath!.substring(0, lastSlash) : '';
+    const docDir = lastSlash >= 0 ? filePath!.substring(0, lastSlash) : importDir;
 
     function resolveItem(item: ListItem): ListItem {
       return { ...item, html: resolveHtmlSrcs(item.html, docDir), children: item.children.map(resolveItem) };
@@ -269,7 +284,7 @@ export default function App() {
       cache.set(slide, resolved);
       return resolved;
     });
-  }, [rawSlides, filePath]);
+  }, [rawSlides, filePath, importDir]);
 
   // Compute a safe index in the same render as slides so children never receive
   // an out-of-bounds value during the frame before the clamp useEffect fires.
@@ -714,6 +729,9 @@ export default function App() {
     setIsDirty(false);
     setCurrentSlideIndex(0);
     await invoke('start_watching', { path }).catch(console.error);
+    setMarpPrompt(isMarp(text) ? { text, dir: dirOf(path) } : null);
+    setImportDir('');
+    setMarpLoss(null);
   }, [allThemes]);
 
   // Startup restore — only when the user has opted in via Settings. Best-effort:
@@ -819,6 +837,23 @@ export default function App() {
     await invoke('stop_watching').catch(() => {});
     await applyFileContent(text, '');
   }, [applyFileContent]);
+
+  const handleImportMarp = useCallback(() => {
+    guardDirty(async () => { try {
+      const selected = await open({
+        filters: [{ name: 'Marp Markdown', extensions: ['md', 'markdown'] }],
+        multiple: false,
+      });
+      if (!selected || typeof selected !== 'string') return;
+      await invoke('stop_watching').catch(() => {});
+      const text: string = await invoke('read_file', { path: selected });
+      const { markdown, dropped } = importMarp(text);
+      await applyFileContent(markdown, '');
+      setImportDir(dirOf(selected));
+      setMarpPrompt(null);
+      setMarpLoss(dropped.length);
+    } catch (err) { console.error('Marp import failed:', err); } });
+  }, [guardDirty, applyFileContent]);
 
   const handleOpenFile = useCallback(() => {
     guardDirty(async () => { try {
@@ -1084,6 +1119,7 @@ export default function App() {
     saveAs: () => { void handleSaveAs(); },
     import: () => guardDirty(() => setShowImport(true)),
     importUrl: () => guardDirty(() => setShowImportUrl(true)),
+    importMarp: handleImportMarp,
     export: handleExport,
     exportPdf: handleExportPdf,
     print: handlePrint,
@@ -1100,6 +1136,7 @@ export default function App() {
     saveAs: () => menuHandlersRef.current.saveAs(),
     import: () => menuHandlersRef.current.import(),
     importUrl: () => menuHandlersRef.current.importUrl(),
+    importMarp: () => menuHandlersRef.current.importMarp(),
     export: () => menuHandlersRef.current.export(),
     exportPdf: () => menuHandlersRef.current.exportPdf(),
     print: () => menuHandlersRef.current.print(),
@@ -1289,12 +1326,24 @@ export default function App() {
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setFileMenuOpen(false); handleOpenFile(); }}>
                 Open <span>{formatCombo(getCombo(keybindings.combos, 'openFile'))}</span>
               </button>
-              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImport(true)); }}>
-                Import from PowerPoint…
-              </button>
-              <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImportUrl(true)); }}>
-                Import from URL…
-              </button>
+              <div style={{ position: 'relative' }} onMouseEnter={() => setImportSubmenuOpen(true)} onMouseLeave={() => setImportSubmenuOpen(false)}>
+                <button className="btn-group-menu-item btn-group-menu-item--shortcut">
+                  Import <span>›</span>
+                </button>
+                {importSubmenuOpen && (
+                  <div className="btn-group-menu btn-group-menu--sub">
+                    <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImport(true)); }}>
+                      From PowerPoint…
+                    </button>
+                    <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImportUrl(true)); }}>
+                      From URL…
+                    </button>
+                    <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); handleImportMarp(); }}>
+                      From Marp…
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="btn-group-menu-separator" />
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" disabled={!filePath || !isDirty} onClick={() => { setFileMenuOpen(false); handleSave(); }}>
                 Save <span>{formatCombo(getCombo(keybindings.combos, 'save'))}</span>
@@ -1544,6 +1593,30 @@ export default function App() {
         <ImportUrlModal
           onImported={handleImportFromUrl}
           onClose={() => setShowImportUrl(false)}
+        />
+      )}
+
+      {marpPrompt && (
+        <InfoBanner
+          message="This looks like a Marp deck."
+          actions={[{
+            label: 'Convert to Kova',
+            onClick: async () => {
+              const { text, dir } = marpPrompt;
+              const { markdown, dropped } = importMarp(text);
+              setMarpPrompt(null);
+              await applyFileContent(markdown, '');
+              setImportDir(dir);
+              setMarpLoss(dropped.length);
+            },
+          }]}
+          onDismiss={() => setMarpPrompt(null)}
+        />
+      )}
+      {marpLoss != null && marpLoss > 0 && (
+        <InfoBanner
+          message={`Imported. ${marpLoss} Marp feature${marpLoss === 1 ? '' : 's'} simplified.`}
+          onDismiss={() => setMarpLoss(null)}
         />
       )}
 
