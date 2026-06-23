@@ -101,6 +101,18 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Kova ${{ github.ref_name }}'
           releaseBody: |
+            > **Beta release** — core features are stable but rough edges remain. Please report bugs via [Issues](../../issues).
+
+            ## What's changed
+
+            ### Bug fixes
+            - **Fixed data loss in "Save & Close" flow** — when an external-change conflict dialog was open at the same time as the unsaved-changes close dialog, clicking "Save" would silently skip the write and close anyway. Edits are now always saved correctly before the window closes.
+            - **Fixed wrong file reloaded by "Reload" button** — the external-change dialog's Reload button now always reloads the file that triggered the alert, even if another file was opened while the dialog was visible.
+            - **Eliminated false-positive "file changed externally" warnings on save** — Kova's own atomic writes are now suppressed at the OS-watcher level before they reach the frontend; only genuine external changes surface a notification.
+            - **External changes now detected after every save** — atomic rename replaces the file's inode; Kova now re-registers the file watcher after each save so subsequent external edits are reliably detected.
+            - **Autosave no longer races with external-change dialog** — autosave is paused while the conflict dialog is open and resumes cleanly once the user resolves the conflict.
+            - **Various UI and rendering fixes** — theme application errors, duplicate image handling, Mermaid diagram rendering timing, and blank slide layout issues resolved from QA review.
+
             ## Installation
 
             | Platform | Download | First-launch note |
@@ -111,8 +123,6 @@ jobs:
             | **Linux (Fedora/RHEL/openSUSE)** | `.rpm` | `sudo dnf install ./Kova_Linux.rpm` |
             | **Linux (Arch)** | AUR: `kova-bin` | `yay -S kova-bin` |
             | **Linux (universal)** | `.AppImage` | `chmod +x Kova_Linux.AppImage && ./Kova_Linux.AppImage` |
-
-            > **Alpha release** — expect rough edges. Please report bugs via [Issues](../../issues).
           releaseDraft: true    # appears as a draft; publish manually after reviewing the assets
           prerelease: false
           args: ${{ matrix.args }}
