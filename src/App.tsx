@@ -1658,7 +1658,7 @@ export default function App() {
           background: 'var(--bg-elevated)', border: '1px solid var(--dirty-color)',
           borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', zIndex: 3000,
           padding: '10px 16px', fontSize: 12, color: 'var(--dirty-color)',
-          maxWidth: 480, textAlign: 'center', pointerEvents: 'none',
+          maxWidth: 480, textAlign: 'center', pointerEvents: 'none', whiteSpace: 'pre-wrap',
         }}>
           {warnMessage}
         </div>

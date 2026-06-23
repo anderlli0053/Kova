@@ -1028,12 +1028,12 @@ pub async fn fetch_url_text(url: String) -> Result<String, String> {
         .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
-    if !ct.is_empty()
-        && !ct.starts_with("text/")
-        && !ct.starts_with("application/json")
-        && !ct.starts_with("application/xml")
-        && !ct.starts_with("application/xhtml")
-    {
+    let ct_ok = ct.is_empty()
+        || ct.starts_with("text/")
+        || ct.starts_with("application/json")
+        || ct.starts_with("application/xml")
+        || ct.starts_with("application/xhtml");
+    if !ct_ok {
         return Err(format!("unexpected Content-Type: {ct}"));
     }
 

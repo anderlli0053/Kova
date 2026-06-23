@@ -294,6 +294,7 @@ function addSlide(
     case 'media':         addMediaSlide(s, slide, t, cy, ch); break;
     case 'code':          addCodeSlide(s, slide, t, cy, ch, warnings); break;
     case 'math':          addTitleContentSlide(s, slide, t, cy, ch, warnings); break;
+    case 'blank':         addBlankSlide(s, t); break;
     default:              addTitleContentSlide(s, slide, t, cy, ch, warnings);
   }
 
@@ -659,6 +660,10 @@ function addCodeSlide(s: PS, slide: Slide, t: Theme, cy: number, ch: number, war
 
   addCodeBlock(s, codeEl.value, codeEl.type === 'code' ? codeEl.lang : undefined, t,
     { x: M, y: codeY, w: W - M * 2, h: codeH });
+}
+
+function addBlankSlide(s: PS, t: Theme) {
+  s.background = { fill: hex(t.colors.background) };
 }
 
 // ── Header / Footer bars ──────────────────────────────────────────────────────

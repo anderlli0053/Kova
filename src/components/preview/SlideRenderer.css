@@ -574,6 +574,8 @@
 .sl-math-layout .sl-math { font-size: clamp(14px, 4.5cqi, 56px); width: 100%; }
 .sl-math-layout .sl-math .katex-display { overflow-x: auto; overflow-y: hidden; }
 
+.sl-blank { height: 100%; }
+
 /* Scale math up in split panes — the formula needs extra boost since cqi is
    relative to the full slide width but the pane is only ~50% of that. */
 .sl-bsp__pane .sl-math,

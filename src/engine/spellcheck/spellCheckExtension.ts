@@ -24,7 +24,7 @@ export function extractWords(doc: string): WordRange[] {
     if (inFencedCode) { pos += len + 1; continue; }
 
     const skip: [number, number][] = [];
-    for (const re of [/`[^`]*`/g, /https?:\/\/\S+/g, /\]\([^)]*\)/g, /<[^>]+>/g]) {
+    for (const re of [/`[^`]*`/g, /https?:\/\/\S+/g, /!\[[^\]]*\]/g, /\]\([^)]*\)/g, /<[^>]+>/g]) {
       let m;
       while ((m = re.exec(line)) !== null) skip.push([m.index, m.index + m[0].length]);
     }

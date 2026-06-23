@@ -250,7 +250,7 @@ export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, total
   }, [mermaidCount]);
   useEffect(() => {
     if (onAllDiagramsReady && mermaidCount === 0) onAllDiagramsReady();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [onAllDiagramsReady, mermaidCount]);
 
   const headerText = theme.header.show
     ? resolveTemplate(theme.header.text, { title: docTitle, date: docDate, slideNumber, totalSlides })
@@ -902,6 +902,10 @@ function MermaidDiagram({ value }: { value: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    let signalled = false;
+    const signalReady = () => {
+      if (!signalled) { signalled = true; onDiagramReadyRef.current?.(); }
+    };
     setSvg('');
     setMermaidError('');
     // Sanitize first: strip any user-supplied securityLevel override, then
@@ -925,17 +929,20 @@ function MermaidDiagram({ value }: { value: string }) {
             return `<svg${a}>`;
           });
           setSvg(scaled);
-          onDiagramReadyRef.current?.();
+          signalReady();
         }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
           const raw = err instanceof Error ? err.message : String(err);
           setMermaidError(raw.replace(/^.*?error:?\s*/i, '').slice(0, 120) || 'Diagram error');
-          onDiagramReadyRef.current?.();
+          signalReady();
         }
       });
-    return () => { cancelled = true; };
+    // If this render is cancelled mid-flight (e.g. theme change during export),
+    // signal ready so the export count still advances; the replacement render
+    // will also signal when it completes.
+    return () => { cancelled = true; signalReady(); };
   }, [baseId, value, mermaidInit]);
 
   if (!svg) {
