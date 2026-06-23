@@ -22,7 +22,6 @@ export function extractWords(doc: string): WordRange[] {
     if (inFrontMatter) { if (line === '---' || line === '...') inFrontMatter = false; pos += len + 1; continue; }
     if (/^(`{3,}|~{3,})/.test(line)) { inFencedCode = !inFencedCode; pos += len + 1; continue; }
     if (inFencedCode) { pos += len + 1; continue; }
-    if (/^\s*[%!]/.test(line)) { pos += len + 1; continue; }
 
     const skip: [number, number][] = [];
     for (const re of [/`[^`]*`/g, /https?:\/\/\S+/g, /\]\([^)]*\)/g, /<[^>]+>/g]) {

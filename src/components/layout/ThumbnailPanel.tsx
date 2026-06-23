@@ -212,6 +212,7 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onTo
                   totalSlides={slides.length}
                   isActive={i === currentIndex}
                   isDragSource={dragFromIndex === i}
+                  isDragging={dragFromIndex !== null}
                   canDrag={Boolean(onReorder)}
                   isHidden={slide.hidden}
                   onSelect={onSelect}
@@ -304,6 +305,7 @@ interface ThumbnailProps {
   totalSlides: number;
   isActive: boolean;
   isDragSource: boolean;
+  isDragging: boolean;
   canDrag: boolean;
   isHidden: boolean;
   onSelect: (index: number) => void;
@@ -325,12 +327,12 @@ interface ThumbnailProps {
 // keystroke. `onSelect`/`onDragStart` are forwarded as stable function
 // references (bound internally below) rather than passed as pre-bound
 // closures, specifically so they don't defeat this memoization.
-const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, canDrag, isHidden, onSelect, onToggleHidden, onDragStart, onContextMenu, theme, docTitle, docDate, slideH, scale, thumbH }: ThumbnailProps) {
+const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, isDragging, canDrag, isHidden, onSelect, onToggleHidden, onDragStart, onContextMenu, theme, docTitle, docDate, slideH, scale, thumbH }: ThumbnailProps) {
   const thumbRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isActive) thumbRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [isActive]);
+    if (isActive && !isDragging) thumbRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [isActive, isDragging]);
 
   return (
     <div

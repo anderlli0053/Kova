@@ -1018,7 +1018,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
   }
 
   function insertTable(rows: number, cols: number) {
-    const headerCells = Array(cols).fill(' Header ').join('|');
+    const headerCells = Array.from({ length: cols }, (_, i) => ` Header ${i + 1} `).join('|');
     const sepCells    = Array(cols).fill(' ------ ').join('|');
     const dataRow     = '|' + Array(cols).fill(' Cell   ').join('|') + '|';
     const dataRows    = Array(rows - 1).fill(dataRow).join('\n');

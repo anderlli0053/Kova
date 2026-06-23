@@ -849,6 +849,8 @@ pub async fn download_and_cache_font(
         return Ok(dest.to_string_lossy().into_owned());
     }
 
+    const MAX_FONT_BYTES: u64 = 20 * 1024 * 1024; // 20 MB
+
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("download failed: {e}"))?;
@@ -857,10 +859,18 @@ pub async fn download_and_cache_font(
         return Err(format!("download failed: HTTP {}", response.status()));
     }
 
+    if response.content_length().unwrap_or(0) > MAX_FONT_BYTES {
+        return Err("font file too large (max 20 MB)".into());
+    }
+
     let bytes = response
         .bytes()
         .await
         .map_err(|e| format!("download failed: {e}"))?;
+
+    if bytes.len() as u64 > MAX_FONT_BYTES {
+        return Err("font file too large (max 20 MB)".into());
+    }
 
     // Verify integrity before writing to disk.
     let actual = format!("{:x}", Sha256::digest(&bytes));
@@ -1012,7 +1022,31 @@ pub async fn fetch_url_text(url: String) -> Result<String, String> {
     if !resp.status().is_success() {
         return Err(format!("fetch failed: HTTP {}", resp.status()));
     }
-    resp.text().await.map_err(|e| format!("read failed: {e}"))
+
+    let ct = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    if !ct.is_empty()
+        && !ct.starts_with("text/")
+        && !ct.starts_with("application/json")
+        && !ct.starts_with("application/xml")
+        && !ct.starts_with("application/xhtml")
+    {
+        return Err(format!("unexpected Content-Type: {ct}"));
+    }
+
+    const MAX_TEXT_BYTES: u64 = 20 * 1024 * 1024; // 20 MB
+    if resp.content_length().unwrap_or(0) > MAX_TEXT_BYTES {
+        return Err("response too large (max 20 MB)".into());
+    }
+
+    let text = resp.text().await.map_err(|e| format!("read failed: {e}"))?;
+    if text.len() as u64 > MAX_TEXT_BYTES {
+        return Err("response too large (max 20 MB)".into());
+    }
+    Ok(text)
 }
 
 fn collect_system_fonts() -> Vec<String> {
@@ -1097,6 +1131,6 @@ fn parse_line_output(bytes: &[u8]) -> Vec<String> {
 
 fn sort_dedup_fonts(mut fonts: Vec<String>) -> Vec<String> {
     fonts.sort_unstable_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
-    fonts.dedup();
+    fonts.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
     fonts
 }

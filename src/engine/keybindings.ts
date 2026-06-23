@@ -1,7 +1,10 @@
 import yaml from 'js-yaml';
 import { invoke } from '@tauri-apps/api/core';
 
-export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(navigator.platform);
+export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPod|iPad/i.test(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (navigator as any).userAgentData?.platform ?? navigator.platform
+);
 
 // snake_case file keys → camelCase action ids
 const KEY_MAP: Record<string, string> = {
@@ -39,6 +42,15 @@ function parseKeybindings(content: string): Record<string, string> {
     for (const [k, v] of Object.entries(raw)) {
       const id = KEY_MAP[k];
       if (id && typeof v === 'string') result[id] = v.toLowerCase().trim();
+    }
+    // Warn on duplicate combos across resolved (user + default) bindings.
+    const merged = { ...DEFAULT_COMBOS, ...result };
+    const seen = new Map<string, string>();
+    for (const [id, combo] of Object.entries(merged)) {
+      if (!combo) continue;
+      const prior = seen.get(combo);
+      if (prior) console.warn(`[keybindings] duplicate combo "${combo}" assigned to "${id}" and "${prior}"`);
+      else seen.set(combo, id);
     }
     return result;
   } catch {

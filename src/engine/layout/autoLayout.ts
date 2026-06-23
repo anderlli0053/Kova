@@ -33,8 +33,9 @@ function logicalElementCount(elements: SlideElement[]): number {
 // each wide character as 2 "columns" instead of 1 brings the estimate back
 // in line with the same chars-per-line constants calibrated for Latin text.
 // Ranges: CJK punctuation/symbols, Hiragana, Katakana, CJK Unified
-// Ideographs (+ Ext A), Hangul Syllables, CJK compatibility, fullwidth forms.
-const WIDE_CHAR_RE = /[⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿＀-｠￠-￦]/;
+// Ideographs (+ Ext A), Hangul Syllables, CJK compatibility, fullwidth forms,
+// CJK Extension B–F and CJK Compatibility Supplement (Plane 2, U+20000–U+2FA1F).
+const WIDE_CHAR_RE = /[⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿＀-｠￠-￦\u{20000}-\u{2FA1F}]/u;
 
 /** Counts `text` in "Latin-character equivalents" — wide scripts count double. */
 function visualLength(text: string): number {

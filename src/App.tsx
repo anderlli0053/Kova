@@ -45,7 +45,8 @@ import type { Theme } from './engine/theme';
 
 import './styles/global.css';
 
-const isMac = /Mac/i.test(navigator.platform);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const isMac = /Mac/i.test((navigator as any).userAgentData?.platform ?? navigator.platform);
 
 // Parent folder of a path (handles both separators); '' if it has none.
 function dirOf(p: string): string {
@@ -306,7 +307,7 @@ export default function App() {
     [frontmatter.aspect_ratio],
   );
 
-  const wordCount = countWords(content);
+  const wordCount = countWords(editorBody);
 
   // Count image references that live outside the document's own folder.
   // These display fine locally but break if the .md file is moved without its images.
@@ -906,6 +907,7 @@ export default function App() {
     const newPath = `${dir}${sep}${trimmed}${ext}`;
     if (newPath === filePath) return;
     try {
+      await invoke('stop_watching').catch(() => {});
       await invoke('rename_file', { oldPath: filePath, newPath });
       setFilePath(newPath);
       await invoke('start_watching', { path: newPath }).catch(console.error);
