@@ -169,9 +169,12 @@ export default function App() {
       header: { ...base.header, ...(themeOverrides.header ?? {}) },
       footer: { ...base.footer, ...(themeOverrides.footer ?? {}) },
     };
-    // Convert raw local path to display URL (asset://) for the logo
+    // Convert raw local path to display URL (asset://) for the logo.
+    // Normalise Windows backslashes to forward slashes first: convertFileSrc
+    // does not do this itself, so backslashes end up URL-encoded as %5C,
+    // producing a malformed URL that the Tauri asset handler cannot resolve.
     if (merged.logo && !/^(https?:|data:|asset:|tauri:)/i.test(merged.logo)) {
-      return { ...merged, logo: convertFileSrc(merged.logo) };
+      return { ...merged, logo: convertFileSrc(merged.logo.replace(/\\/g, '/')) };
     }
     return merged;
   }, [allThemes, activeThemeId, themeOverrides]);
@@ -689,7 +692,16 @@ export default function App() {
 
   const handleThemeSelect = useCallback((id: string) => {
     setActiveThemeId(id);
-    setThemeOverrides({});
+    // Preserve header/footer overrides across theme switches — these are
+    // user-configured content values, not theme-specific style choices.
+    // Color/font/logo overrides are intentionally cleared since they were
+    // customising the old theme and likely don't apply to the new one.
+    setThemeOverrides((prev) => {
+      const preserved: Partial<Theme> = {};
+      if (prev.header !== undefined) preserved.header = prev.header;
+      if (prev.footer !== undefined) preserved.footer = prev.footer;
+      return preserved;
+    });
     setContent((prev) => {
       const patched = patchFrontmatter(prev, { theme: id, theme_overrides: null });
       if (patched !== prev) setIsDirty(true);
@@ -882,7 +894,7 @@ export default function App() {
       await invoke('stop_watching').catch(() => {});
       const text: string = await invoke('read_file', { path: selected });
       await applyFileContent(text, selected);
-    } catch (err) { console.error('Open failed:', err); }});
+    } catch (err) { console.error('Open failed:', err); setWarnMessage(`Could not open file: ${err}`); }});
   }, [guardDirty, applyFileContent]);
 
   const buildSaveContent = useCallback(() => {
@@ -952,6 +964,7 @@ export default function App() {
     } catch (err) {
       setIsDirty(true);
       console.error('Save failed:', err);
+      setWarnMessage(`Save failed: ${err}`);
     }
   }, [filePath, content, buildSaveContent]);
 
@@ -969,7 +982,7 @@ export default function App() {
       setIsDirty(false);
       await invoke('start_watching', { path: target }).catch(console.error);
       return target;
-    } catch (err) { console.error('Save As failed:', err); return null; }
+    } catch (err) { console.error('Save As failed:', err); setWarnMessage(`Save failed: ${err}`); return null; }
   }, [filePath, content, buildSaveContent]);
 
   const handleExport = useCallback(async () => {

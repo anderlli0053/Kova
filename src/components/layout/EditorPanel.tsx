@@ -884,9 +884,13 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
         const view = viewRef.current;
         if (!view) return;
         try {
+          // Capture cursor position before the async clipboard read. The
+          // document state can change during the await (especially on Windows
+          // with large clipboard content), making a post-await position read
+          // stale; CodeMirror silently rejects dispatches with invalid ranges.
+          const { from, to } = view.state.selection.main;
           const text = await navigator.clipboard.readText();
           if (!text) return;
-          const { from, to } = view.state.selection.main;
           view.dispatch({
             changes: { from, to, insert: text },
             selection: EditorSelection.cursor(from + text.length),
