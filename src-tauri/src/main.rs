@@ -15,5 +15,15 @@ fn main() {
     unsafe {
         XInitThreads();
     }
+
+    // WebKitGTK 2.42+ enables the DMA-BUF renderer by default, which fails
+    // with EGL_BAD_DISPLAY on some GPU configurations (AMD on Arch-based
+    // distros like CachyOS). Must be set before the webview is created.
+    // Respect any explicit override the user has already set.
+    #[cfg(target_os = "linux")]
+    if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
+
     kova_lib::run()
 }
