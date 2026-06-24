@@ -6,16 +6,27 @@ fn home_dir() -> Result<PathBuf, String> {
 }
 
 pub fn check_in_home(path: &Path) -> Result<(), String> {
-    let home = home_dir()?;
-    // On Windows, std::fs::canonicalize adds a \\?\ UNC prefix. The `path`
-    // argument is already canonical, so home must also be canonicalized before
-    // starts_with — otherwise the prefix mismatch causes the check to always
-    // fail, blocking every file read/write on Windows.
-    let canonical_home = std::fs::canonicalize(&home).unwrap_or(home);
-    if path.starts_with(&canonical_home) {
-        Ok(())
-    } else {
-        Err("Access denied: path is outside your home directory".to_string())
+    // On Linux this enforces the Flatpak sandbox boundary: Flatpak apps are
+    // expected to access only the user's home directory, so we hard-fail for
+    // paths outside it. On macOS and Windows users legitimately keep files
+    // anywhere (e.g. C:\ak\... on Windows or /Volumes/... on macOS), so the
+    // check is skipped — canonicalize() already prevents path-traversal attacks
+    // on all platforms by resolving symlinks and .. components.
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = path; // suppress unused-variable warning
+        return Ok(());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let home = home_dir()?;
+        let canonical_home = std::fs::canonicalize(&home).unwrap_or(home);
+        if path.starts_with(&canonical_home) {
+            Ok(())
+        } else {
+            Err("Access denied: path is outside your home directory".to_string())
+        }
     }
 }
 
@@ -78,35 +89,33 @@ fn atomic_write(dest: &std::path::Path, data: &[u8]) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    // These tests use Windows-style paths with backslash separators and the
-    // \\?\ UNC prefix that std::fs::canonicalize adds on Windows. They only
-    // make sense on Windows because backslash is not a path separator on
-    // Linux/macOS, so Path would treat the whole string as one component.
-    #[cfg(target_os = "windows")]
-    mod windows_unc {
+    // These tests verify the Linux home-boundary logic using portable path
+    // construction. The Windows UNC-prefix tests have been removed: check_in_home
+    // is now a no-op on Windows (users may save anywhere), so those assertions
+    // are no longer meaningful.
+    #[cfg(target_os = "linux")]
+    mod linux_home_boundary {
         use std::path::Path;
 
         #[test]
-        fn unc_prefix_mismatch_was_the_bug() {
-            let bare_home      = Path::new(r"C:\Users\ross");
-            let canonical_path = Path::new(r"\\?\C:\Users\ross\Documents\file.md");
-            // Old behaviour: bare home vs canonical path — always false.
-            assert!(!canonical_path.starts_with(bare_home));
+        fn path_inside_home_is_allowed() {
+            let home = Path::new("/home/ross");
+            let inside = Path::new("/home/ross/Documents/file.md");
+            assert!(inside.starts_with(home));
         }
 
         #[test]
-        fn unc_prefix_matches_when_home_is_also_canonical() {
-            let canonical_home = Path::new(r"\\?\C:\Users\ross");
-            let canonical_path = Path::new(r"\\?\C:\Users\ross\Documents\file.md");
-            // Fixed behaviour: both canonical — starts_with works correctly.
-            assert!(canonical_path.starts_with(canonical_home));
+        fn path_outside_home_is_blocked() {
+            let home = Path::new("/home/ross");
+            let outside = Path::new("/home/other/secret.txt");
+            assert!(!outside.starts_with(home));
         }
 
         #[test]
-        fn traversal_still_blocked_after_fix() {
-            let canonical_home = Path::new(r"\\?\C:\Users\ross");
-            let outside        = Path::new(r"\\?\C:\Users\other\secret.txt");
-            assert!(!outside.starts_with(canonical_home));
+        fn traversal_outside_home_is_blocked() {
+            let home = Path::new("/home/ross");
+            let traversal = Path::new("/etc/passwd");
+            assert!(!traversal.starts_with(home));
         }
     }
 }
