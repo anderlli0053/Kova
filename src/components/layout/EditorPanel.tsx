@@ -891,9 +891,14 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
           const { from, to } = view.state.selection.main;
           const text = await navigator.clipboard.readText();
           if (!text) return;
+          // CodeMirror normalises \r\n → \n internally, so the inserted length
+          // may be shorter than text.length. Use the normalised form to compute
+          // the correct cursor position; otherwise the dispatch is silently
+          // rejected when the cursor would land past the end of the new document.
+          const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
           view.dispatch({
-            changes: { from, to, insert: text },
-            selection: EditorSelection.cursor(from + text.length),
+            changes: { from, to, insert: normalised },
+            selection: EditorSelection.cursor(from + normalised.length),
           });
           view.focus();
         } catch {
