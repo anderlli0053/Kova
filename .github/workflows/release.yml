@@ -103,6 +103,9 @@ jobs:
           releaseBody: |
             ## What's new
 
+            ### New
+            - **Focus mode button in the toolbar** — focus mode is now accessible directly from the titlebar, between the Present button and the Inspector toggle. The icon glows accent-coloured when active so the current state is always obvious at a glance. The keyboard shortcut (`Ctrl+Shift+F`) still works as before.
+
             ### Bug fixes
             - **Fixed file open and save on Windows for non-standard paths** — the home-directory sandbox that restricted file access was originally added for Linux Flatpak and should never have applied to Windows or macOS. Users whose files live outside the standard home directory (e.g. `C:\ak\...`) can now open and save files normally. Thanks @a1880 for the report (#10).
             - **Fixed logo not rendering on Windows** — paths returned by the file dialog use backslashes, which were being URL-encoded rather than converted to forward slashes before being passed to the asset protocol, producing a URL the handler could not resolve. Thanks @a1880 (#12).
