@@ -154,6 +154,7 @@ export default function App() {
   const [activeThemeId, setActiveThemeId] = useState<string>(DEFAULT_THEME.id);
   const [themeOverrides, setThemeOverrides] = useState<Partial<Theme>>({});
   const [missingThemeId, setMissingThemeId]   = useState<string | null>(null);
+  const [resolvedLogoUrl, setResolvedLogoUrl] = useState<string | undefined>(undefined);
 
   const installedRemoteIds = useMemo(
     () => new Set(allThemes.filter((t) => !BUILT_IN_THEMES.some((b) => b.id === t.id)).map((t) => t.id)),
@@ -169,17 +170,30 @@ export default function App() {
       header: { ...base.header, ...(themeOverrides.header ?? {}) },
       footer: { ...base.footer, ...(themeOverrides.footer ?? {}) },
     };
-    // Convert raw local path to display URL (asset://) for the logo.
-    // Normalise Windows backslashes to forward slashes first: convertFileSrc
-    // does not do this itself, so backslashes end up URL-encoded as %5C,
-    // producing a malformed URL that the Tauri asset handler cannot resolve.
-    if (merged.logo && !/^(https?:|data:|asset:|tauri:)/i.test(merged.logo)) {
-      return { ...merged, logo: convertFileSrc(merged.logo.replace(/\\/g, '/')) };
-    }
-    return merged;
-  }, [allThemes, activeThemeId, themeOverrides]);
+    // Swap in the pre-resolved data URL for the logo. The asset protocol cannot
+    // reliably serve absolute Windows paths outside the home directory, so we
+    // read the file via IPC (see the useEffect below) and embed it as base64.
+    return { ...merged, logo: resolvedLogoUrl };
+  }, [allThemes, activeThemeId, themeOverrides, resolvedLogoUrl]);
 
   // Register any bundled fonts declared by the active theme
+  // Resolve the raw logo filesystem path to a data URL via IPC so the image
+  // works in both windows regardless of asset-protocol scope restrictions.
+  useEffect(() => {
+    const raw = themeOverrides.logo;
+    if (!raw) { setResolvedLogoUrl(undefined); return; }
+    if (/^(https?:|data:)/i.test(raw)) { setResolvedLogoUrl(raw); return; }
+    const ext  = raw.replace(/\\/g, '/').split('.').pop()?.toLowerCase() ?? 'png';
+    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+               : ext === 'svg'  ? 'image/svg+xml'
+               : ext === 'gif'  ? 'image/gif'
+               : ext === 'webp' ? 'image/webp'
+               : 'image/png';
+    invoke<string>('read_file_b64', { path: raw })
+      .then((b64) => setResolvedLogoUrl(`data:${mime};base64,${b64}`))
+      .catch(() => setResolvedLogoUrl(undefined));
+  }, [themeOverrides.logo]);
+
   useEffect(() => {
     if (activeTheme.bundledFonts?.length) {
       registerBundledFonts(activeTheme.bundledFonts);
