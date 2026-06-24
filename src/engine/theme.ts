@@ -487,8 +487,11 @@ export function sanitiseThemeOverrides(raw: Record<string, unknown>): Partial<Th
     if (Object.keys(sanitised).length > 0) result.fonts = sanitised as ThemeFonts;
   }
 
-  // Logo: only https / data:image/ allowed — same rule as normaliseTheme.
-  if (typeof raw.logo === 'string' && /^(https?:|data:image\/)/.test(raw.logo)) {
+  // Logo: allow remote URLs, data URIs, and absolute local filesystem paths.
+  // normaliseTheme (for installed community themes) restricts to https/data only;
+  // here we also accept local paths because users set their logo via the file
+  // dialog and the path is resolved to a data URL via IPC before rendering.
+  if (typeof raw.logo === 'string' && /^(https?:|data:image\/|\/|[A-Za-z]:[/\\])/.test(raw.logo)) {
     result.logo = raw.logo;
   }
   const VALID_LOGO_POSITIONS: Set<string> = new Set(['top-left', 'top-right', 'bottom-left', 'bottom-right']);
