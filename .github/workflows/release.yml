@@ -104,12 +104,12 @@ jobs:
             ## What's new
 
             ### Bug fixes
-            - **Fixed data loss in "Save & Close" flow** — when an external-change conflict dialog was open at the same time as the unsaved-changes close dialog, clicking "Save" would silently skip the write and close anyway. Edits are now always saved correctly before the window closes.
-            - **Fixed wrong file reloaded by "Reload" button** — the external-change dialog's Reload button now always reloads the file that triggered the alert, even if another file was opened while the dialog was visible.
-            - **Eliminated false-positive "file changed externally" warnings on save** — Kova's own atomic writes are now suppressed at the OS-watcher level before they reach the frontend; only genuine external changes surface a notification.
-            - **External changes now detected after every save** — atomic rename replaces the file's inode; Kova now re-registers the file watcher after each save so subsequent external edits are reliably detected.
-            - **Autosave no longer races with external-change dialog** — autosave is paused while the conflict dialog is open and resumes cleanly once the user resolves the conflict.
-            - **Various UI and rendering fixes** — theme application errors, duplicate image handling, Mermaid diagram rendering timing, and blank slide layout issues resolved.
+            - **Fixed file open and save on Windows for non-standard paths** — the home-directory sandbox that restricted file access was originally added for Linux Flatpak and should never have applied to Windows or macOS. Users whose files live outside the standard home directory (e.g. `C:\ak\...`) can now open and save files normally. Thanks @a1880 for the report (#10).
+            - **Fixed logo not rendering on Windows** — paths returned by the file dialog use backslashes, which were being URL-encoded rather than converted to forward slashes before being passed to the asset protocol, producing a URL the handler could not resolve. Thanks @a1880 (#12).
+            - **Fixed header and footer being lost when switching themes** — changing the active theme was clearing all overrides including user-configured header and footer text. These values are now preserved across theme switches. Thanks @a1880 (#11).
+            - **Fixed paste failing for large text at the end of the document on Windows** — the paste handler was reading the cursor position after an async clipboard read. On Windows, reading a large clipboard payload is slow enough that the editor state can shift during the wait, making the position invalid. CodeMirror silently rejects out-of-range dispatches. Cursor position is now captured before the async call. Thanks @Sl-Alex (#13).
+            - **Speaker notes now included in PPTX export** — notes written below `???` on a slide were parsed and shown in presenter view but were never written into the exported `.pptx` file. They now appear in PowerPoint's Notes pane. Thanks @Benjoyo (#14).
+            - **Title + Image slide layout now stacks vertically** — title sits above the image rather than side by side.
 
             ---
 
