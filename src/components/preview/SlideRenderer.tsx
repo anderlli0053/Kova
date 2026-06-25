@@ -644,11 +644,11 @@ function ElementNode({ el }: { el: SlideElement }) {
       return (
         <table className="sl-table">
           <thead>
-            <tr>{el.headers.map((h, i) => <th key={i}>{h}</th>)}</tr>
+            <tr>{el.headers.map((h, i) => <th key={i} style={{ textAlign: el.align?.[i] || undefined }}>{h}</th>)}</tr>
           </thead>
           <tbody>
             {el.rows.map((row, i) => (
-              <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
+              <tr key={i}>{row.map((cell, j) => <td key={j} style={{ textAlign: el.align?.[j] || undefined }}>{cell}</td>)}</tr>
             ))}
           </tbody>
         </table>

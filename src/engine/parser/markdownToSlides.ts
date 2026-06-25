@@ -211,7 +211,7 @@ function convertRoot(tree: Root, placeholders: Map<number, SlideElement>): Conve
         const [headerRow, ...bodyRows] = t.children;
         const headers = (headerRow?.children ?? []).map((cell) => toString(cell));
         const rows = bodyRows.map((row) => row.children.map((cell) => toString(cell)));
-        elements.push({ type: 'table', headers, rows });
+        elements.push({ type: 'table', headers, rows, align: t.align ?? undefined });
         break;
       }
 
