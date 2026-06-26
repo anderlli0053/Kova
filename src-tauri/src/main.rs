@@ -27,54 +27,115 @@ extern "C" {
     );
 }
 
-// WebKit's GPU process calls eglGetPlatformDisplayEXT(EGL_PLATFORM_WAYLAND_EXT,
-// wl_display, …), which requires EGL_EXT_platform_wayland (or the KHR variant)
-// in the EGL client extension string. If the extension is absent the call
-// returns EGL_NO_DISPLAY with EGL_BAD_PARAMETER and the GPU process aborts.
-// This probe checks the client extension string via eglQueryString before any
-// WebView is created, so we can set LIBGL_ALWAYS_SOFTWARE=1 as a fallback —
-// Mesa's software renderer always advertises the Wayland platform extension.
+// Probes whether EGL can actually create a Wayland platform display.
+//
+// The AppImage bundles WebKitGTK built on Ubuntu 22.04, which calls
+// eglGetPlatformDisplayEXT(EGL_PLATFORM_WAYLAND_EXT, wl_display, NULL) against
+// whatever libEGL.so.1 is on the host system. On Fedora 44 with Mesa 26.x and
+// virtual GPU drivers (virgl, vmwgfx), Mesa advertises EGL_EXT_platform_wayland
+// in the extension string but the actual display creation fails with
+// EGL_BAD_PARAMETER, aborting the WebKit web process before the window appears.
+//
+// We replicate the exact call WebKit makes — connecting to the Wayland compositor
+// ourselves and attempting eglGetPlatformDisplayEXT — so we detect real failures
+// rather than just checking whether the extension string mentions the platform.
+// If it fails, LIBGL_ALWAYS_SOFTWARE=1 forces Mesa llvmpipe, whose EGL reliably
+// supports the Wayland platform on all compositors.
 #[cfg(target_os = "linux")]
-fn egl_supports_wayland_platform() -> bool {
+fn egl_wayland_display_works() -> bool {
     use std::ffi::{CStr, CString};
     use std::os::raw::{c_char, c_void};
 
+    type WlDisplayConnectFn = unsafe extern "C" fn(*const c_char) -> *mut c_void;
+    type WlDisplayDisconnectFn = unsafe extern "C" fn(*mut c_void);
+    type EglGetPlatformDisplayFn = unsafe extern "C" fn(u32, *mut c_void, *const usize) -> *mut c_void;
     type EglQueryStringFn = unsafe extern "C" fn(*mut c_void, i32) -> *const c_char;
 
-    let lib = match CString::new("libEGL.so.1") {
+    macro_rules! load_sym {
+        ($handle:expr, $name:literal) => {{
+            let s = CString::new($name).unwrap();
+            dlsym($handle, s.as_ptr())
+        }};
+    }
+
+    let wl_lib = match CString::new("libwayland-client.so.0") {
+        Ok(s) => s,
+        Err(_) => return true,
+    };
+    let egl_lib = match CString::new("libEGL.so.1") {
         Ok(s) => s,
         Err(_) => return true,
     };
 
     unsafe {
-        let handle = dlopen(lib.as_ptr(), 1 /* RTLD_LAZY */);
-        if handle.is_null() {
-            return true; // Can't load EGL — let WebKit try normally
+        let wl_handle = dlopen(wl_lib.as_ptr(), 1 /* RTLD_LAZY */);
+        if wl_handle.is_null() {
+            return true; // Can't load Wayland — not our problem
         }
 
-        let sym = CString::new("eglQueryString").unwrap();
-        let fn_ptr = dlsym(handle, sym.as_ptr());
+        let egl_handle = dlopen(egl_lib.as_ptr(), 1 /* RTLD_LAZY */);
+        if egl_handle.is_null() {
+            dlclose(wl_handle);
+            return true;
+        }
 
-        let supported = if !fn_ptr.is_null() {
-            let egl_query_string: EglQueryStringFn = std::mem::transmute(fn_ptr);
-            // eglQueryString(EGL_NO_DISPLAY=NULL, EGL_EXTENSIONS=0x3055) returns
-            // the client extension string without requiring an initialised display.
-            // Returns NULL if the EGL_EXT_client_extensions extension is absent,
-            // which also means EGL_EXT_platform_wayland cannot be present.
-            let ext_ptr = egl_query_string(std::ptr::null_mut(), 0x3055);
+        let wl_connect_ptr = load_sym!(wl_handle, "wl_display_connect");
+        let wl_disconnect_ptr = load_sym!(wl_handle, "wl_display_disconnect");
+        let egl_get_platform_ptr = load_sym!(egl_handle, "eglGetPlatformDisplayEXT");
+        let egl_query_ptr = load_sym!(egl_handle, "eglQueryString");
+
+        // Without the platform display function we can't replicate WebKit's call
+        if egl_get_platform_ptr.is_null() || wl_connect_ptr.is_null() {
+            dlclose(egl_handle);
+            dlclose(wl_handle);
+            return true;
+        }
+
+        // Fast path: if EGL_EXT_platform_wayland isn't even in the client
+        // extension string the display creation will definitely fail.
+        if !egl_query_ptr.is_null() {
+            let query: EglQueryStringFn = std::mem::transmute(egl_query_ptr);
+            let ext_ptr = query(std::ptr::null_mut(), 0x3055 /* EGL_EXTENSIONS */);
             if ext_ptr.is_null() {
-                false
-            } else {
-                let exts = CStr::from_ptr(ext_ptr).to_string_lossy();
-                exts.contains("EGL_EXT_platform_wayland")
-                    || exts.contains("EGL_KHR_platform_wayland")
+                dlclose(egl_handle);
+                dlclose(wl_handle);
+                return false;
             }
-        } else {
-            true // Symbol not found — let WebKit try normally
-        };
+            let exts = CStr::from_ptr(ext_ptr).to_string_lossy();
+            if !exts.contains("EGL_EXT_platform_wayland")
+                && !exts.contains("EGL_KHR_platform_wayland")
+            {
+                dlclose(egl_handle);
+                dlclose(wl_handle);
+                return false;
+            }
+        }
 
-        dlclose(handle);
-        supported
+        // Extension is advertised — now actually attempt the call WebKit makes.
+        // Our Wayland connection is independent of GTK's; connecting a second
+        // client to the same compositor is safe and normal.
+        let wl_connect: WlDisplayConnectFn = std::mem::transmute(wl_connect_ptr);
+        let wl_display = wl_connect(std::ptr::null()); // NULL → use WAYLAND_DISPLAY
+
+        if wl_display.is_null() {
+            // Can't reach the compositor at all — not an EGL issue
+            dlclose(egl_handle);
+            dlclose(wl_handle);
+            return true;
+        }
+
+        let egl_get_platform: EglGetPlatformDisplayFn =
+            std::mem::transmute(egl_get_platform_ptr);
+        // EGL_PLATFORM_WAYLAND_EXT = 0x31D8
+        let egl_display = egl_get_platform(0x31D8, wl_display, std::ptr::null());
+
+        let wl_disconnect: WlDisplayDisconnectFn = std::mem::transmute(wl_disconnect_ptr);
+        wl_disconnect(wl_display);
+
+        dlclose(egl_handle);
+        dlclose(wl_handle);
+
+        !egl_display.is_null()
     }
 }
 
@@ -100,7 +161,6 @@ fn main() {
     // web/network processes cannot resolve paths correctly from the AppImage
     // mount location. Disable it via the WebKit API before the first WebView
     // is created. gtk::init() is idempotent — Tauri calls it again internally.
-    // Note: this does not affect the GPU process sandbox (controlled separately).
     #[cfg(target_os = "linux")]
     if std::env::var("APPIMAGE").is_ok() {
         let _ = gtk::init();
@@ -112,16 +172,17 @@ fn main() {
         }
     }
 
-    // WebKit's GPU process uses eglGetPlatformDisplayEXT(EGL_PLATFORM_WAYLAND_EXT)
-    // which requires the EGL_EXT_platform_wayland client extension. On some
-    // systems (KDE/KWin Wayland, virtual machines with non-Mesa EGL), this
-    // extension is absent and the GPU process aborts with EGL_BAD_PARAMETER.
-    // Fall back to Mesa software rendering, whose EGL always advertises the
-    // Wayland platform extension. Only activates when actually needed.
+    // The AppImage bundles WebKitGTK built on Ubuntu 22.04, which calls
+    // eglGetPlatformDisplayEXT(EGL_PLATFORM_WAYLAND_EXT, …) against the host
+    // system's libEGL. On some host EGL stacks (Mesa virgl/vmwgfx in VMs, KDE
+    // Wayland with certain GPU configs) the extension is advertised but the
+    // display creation actually fails, aborting the WebKit process. We replicate
+    // the exact call here; if it fails, Mesa llvmpipe (LIBGL_ALWAYS_SOFTWARE=1)
+    // reliably supports Wayland EGL on every compositor.
     #[cfg(target_os = "linux")]
     if std::env::var("WAYLAND_DISPLAY").is_ok()
         && std::env::var("LIBGL_ALWAYS_SOFTWARE").is_err()
-        && !egl_supports_wayland_platform()
+        && !egl_wayland_display_works()
     {
         std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1");
     }
