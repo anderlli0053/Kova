@@ -199,6 +199,8 @@ function buildMermaidInit(theme: Theme): string {
     clusterBkg:            tertiaryBg,
     titleColor:            c.text,
     edgeLabelBackground:   c.background,
+    signalColor:           c.text,
+    signalTextColor:       c.text,
     ...cScale,
     ...pie,
     pieTitleTextColor:     c.text,
