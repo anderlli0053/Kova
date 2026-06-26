@@ -28,7 +28,7 @@ export type SlideElement =
   | { type: 'mermaid'; value: string }
   | { type: 'math'; value: string; display: boolean }
   | { type: 'blockquote'; text: string; attribution?: string }
-  | { type: 'table'; headers: string[]; rows: string[][] }
+  | { type: 'table'; headers: string[]; rows: string[][]; align?: ('left' | 'right' | 'center' | null)[] }
   | { type: 'youtube';  label: string; url: string }
   | { type: 'poll';     label: string; url: string }
   | { type: 'progress'; label: string; value: number }
