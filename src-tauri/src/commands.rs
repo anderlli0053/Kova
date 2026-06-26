@@ -654,6 +654,16 @@ pub fn write_file_bytes(path: String, data: String) -> Result<(), String> {
 pub fn read_file_b64(path: String) -> Result<String, String> {
     use base64::Engine;
     let safe = file_io::safe_read_path(&path)?;
+    let ext = safe.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase());
+    let allowed = matches!(
+        ext.as_deref(),
+        Some("png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "bmp" | "avif" | "tiff" | "ico")
+    );
+    if !allowed {
+        return Err("Access denied: only image files may be read as base64".to_string());
+    }
     let bytes = std::fs::read(&safe).map_err(|e| e.to_string())?;
     Ok(base64::engine::general_purpose::STANDARD.encode(&bytes))
 }

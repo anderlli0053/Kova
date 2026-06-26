@@ -86,9 +86,20 @@ function preprocess(content: string): PreprocessResult {
   const references: string[] = [];
   let nextIdx = 0;
   const cleanLines: string[] = [];
+  let inFencedCode = false;
 
   for (const line of content.split('\n')) {
     const t = line.trim();
+
+    if (/^(`{3,}|~{3,})/.test(t)) {
+      inFencedCode = !inFencedCode;
+      cleanLines.push(line);
+      continue;
+    }
+    if (inFencedCode) {
+      cleanLines.push(line);
+      continue;
+    }
 
     if (t === '|||') {
       cleanLines.push('<!-- column-break -->');

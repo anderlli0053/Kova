@@ -924,8 +924,8 @@ export default function App() {
       overridePatch.colors = themeOverrides.colors;
     if (themeOverrides.fonts && Object.keys(themeOverrides.fonts).length > 0)
       overridePatch.fonts = themeOverrides.fonts;
-    if (themeOverrides.logo !== undefined)
-      overridePatch.logo = themeOverrides.logo;
+    if ('logo' in themeOverrides)
+      overridePatch.logo = themeOverrides.logo ?? null;
     if (themeOverrides.logo_position !== undefined)
       overridePatch.logo_position = themeOverrides.logo_position;
     if (themeOverrides.logo_opacity !== undefined)
