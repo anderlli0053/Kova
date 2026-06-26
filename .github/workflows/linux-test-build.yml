@@ -55,6 +55,17 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Remove the WebKit helper process binaries from the build runner before
+      # Tauri assembles the AppImage. The bundler copies these explicitly (not
+      # via linuxdeploy), so LINUXDEPLOY_EXCLUDE_LIBS alone doesn't remove them.
+      # Without these binaries in the AppImage, webkit falls back to the host
+      # system's WebKitWebProcess, which is ABI-compatible with the host EGL/Mesa.
+      - name: Remove WebKit helper binaries before bundling
+        run: |
+          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess
+          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess
+          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebDriver
+
       - name: Build and publish Linux pre-release
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:

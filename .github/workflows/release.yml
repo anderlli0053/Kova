@@ -76,6 +76,18 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Remove the WebKit helper process binaries from the build runner before
+      # Tauri assembles the AppImage. The bundler copies these explicitly (not
+      # via linuxdeploy), so LINUXDEPLOY_EXCLUDE_LIBS alone doesn't remove them.
+      # Without these binaries in the AppImage, webkit falls back to the host
+      # system's WebKitWebProcess, which is ABI-compatible with the host EGL/Mesa.
+      - name: Remove WebKit helper binaries before bundling
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess
+          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess
+          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebDriver
+
       # Write the App Store Connect API key to disk for the post-build notarisation step.
       # The tr -d '\r' strips Windows CRLF endings that corrupt the PEM format.
       - name: Write App Store Connect API key
