@@ -55,31 +55,12 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      # Remove the WebKit helper process binaries from the build runner before
-      # Tauri assembles the AppImage. The bundler copies these explicitly (not
-      # via linuxdeploy), so LINUXDEPLOY_EXCLUDE_LIBS alone doesn't remove them.
-      # Without these binaries in the AppImage, webkit falls back to the host
-      # system's WebKitWebProcess, which is ABI-compatible with the host EGL/Mesa.
-      - name: Remove WebKit helper binaries before bundling
-        run: |
-          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebProcess
-          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitNetworkProcess
-          sudo rm -f /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1/WebKitWebDriver
-
       - name: Build and publish Linux pre-release
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # Exclude webkit2gtk from the AppImage bundle so the AppImage uses the
-          # host system's webkit2gtk instead. Bundling webkit compiled on Ubuntu
-          # 22.04 causes EGL_BAD_PARAMETER crashes on other distros (Fedora, Arch,
-          # etc.) because the bundled binary conflicts with the host's Mesa/EGL
-          # stack. The AppImage requires webkit2gtk-4.1 to be installed on the
-          # host (standard on all major desktop Linux distributions).
-          # See: https://github.com/tauri-apps/tauri/issues/11790
-          LINUXDEPLOY_EXCLUDE_LIBS: libwebkit2gtk-4.1.so.0:libjavascriptcoregtk-4.1.so.0
         with:
           tagName: ${{ inputs.tag }}
           releaseName: 'Kova ${{ inputs.tag }} (Linux test build)'
