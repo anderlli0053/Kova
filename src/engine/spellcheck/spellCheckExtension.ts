@@ -30,7 +30,7 @@ export function extractWords(doc: string): WordRange[] {
     }
     skip.sort((a, b) => a[0] - b[0]);
 
-    const wordRe = /[a-zA-Z][a-zA-Z'-]*/g;
+    const wordRe = /\p{L}[\p{L}'-]*/gu;
     let m;
     outer: while ((m = wordRe.exec(line)) !== null) {
       const rawFrom = m.index;
