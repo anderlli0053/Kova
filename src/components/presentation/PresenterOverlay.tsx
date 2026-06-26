@@ -21,9 +21,12 @@ interface Props {
   onExit: () => void;
 }
 
-const HUD_H       = 56;  // px
-const RIGHT_W     = 280; // px
-const SLIDE_W     = 960; // virtual slide width — matches PresentationOverlay / AudienceApp
+const HUD_H           = 56;  // px
+const RIGHT_W_DEFAULT = 280; // px
+const RIGHT_W_MIN     = 180; // px
+const RIGHT_W_MAX     = 600; // px
+const SLIDE_W         = 960; // virtual slide width — matches PresentationOverlay / AudienceApp
+const STORAGE_KEY     = 'kova:presenter-right-w';
 
 function formatTime(seconds: number): string {
   const h = Math.floor(seconds / 3600);
@@ -42,6 +45,13 @@ export function PresenterOverlay({
   const total     = slides.length;
 
   const slideH = Math.round(SLIDE_W * aspectRatio.h / aspectRatio.w);
+
+  const [rightW, setRightW] = useState(() => {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (!s) return RIGHT_W_DEFAULT;
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) ? Math.min(RIGHT_W_MAX, Math.max(RIGHT_W_MIN, n)) : RIGHT_W_DEFAULT;
+  });
 
   const [elapsed, setElapsed]           = useState(0);
   const [currentScale, setCurrentScale] = useState(1);
@@ -113,6 +123,28 @@ export function PresenterOverlay({
     }
   }, [laserActive, laserColor]);
 
+  const handleResizeDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = rightW;
+    document.body.style.cursor    = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = (ev: MouseEvent) => {
+      const newW = Math.min(RIGHT_W_MAX, Math.max(RIGHT_W_MIN, startW + (startX - ev.clientX)));
+      setRightW(newW);
+    };
+    const onUp = () => {
+      document.body.style.cursor    = '';
+      document.body.style.userSelect = '';
+      setRightW(w => { localStorage.setItem(STORAGE_KEY, String(w)); return w; });
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }, [rightW]);
+
   const goNext = useCallback(() => {
     if (currentIndex < total - 1) onNavigate(currentIndex + 1);
   }, [currentIndex, total, onNavigate]);
@@ -153,7 +185,7 @@ export function PresenterOverlay({
         outline: 'none',
         '--pres-ar-w': aspectRatio.w,
         '--pres-ar-h': aspectRatio.h,
-        '--presenter-right-w': `${RIGHT_W}px`,
+        '--presenter-right-w': `${rightW}px`,
         '--presenter-hud-h': `${HUD_H}px`,
       } as React.CSSProperties}
     >
@@ -195,6 +227,9 @@ export function PresenterOverlay({
             )}
           </div>
         </div>
+
+        {/* ── Resize handle ── */}
+        <div className="pres-presenter__resize-handle" onMouseDown={handleResizeDragStart} />
 
         {/* ── Right column ── */}
         <div className="pres-presenter__right">
