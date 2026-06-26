@@ -1620,6 +1620,7 @@ export default function App() {
               filePath={filePath}
               uiTheme={resolvedUiTheme}
               editorFontFamily={EDITOR_FONT_OPTIONS.find(o => o.value === settings.editorFont)?.family}
+              wordWrap={settings.editorWordWrap}
               spellCheckEnabled={settings.spellCheckEnabled}
               spellCheckLanguage={settings.spellCheckLanguage}
             />

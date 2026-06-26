@@ -35,6 +35,7 @@ interface Props {
   filePath?: string | null;
   uiTheme?: 'dark' | 'light';
   editorFontFamily?: string;
+  wordWrap?: boolean;
   spellCheckEnabled?: boolean;
   spellCheckLanguage?: string;
 }
@@ -56,8 +57,9 @@ function encodeMarkdownPath(p: string): string {
 }
 
 
-const SCROLLER_BASE = { fontSize: '14px', lineHeight: '1.7' };
-const CONTENT       = { padding: '16px 24px', maxWidth: '720px', margin: '0 auto' };
+const DEFAULT_FONT_SIZE = 14;
+const SCROLLER_BASE = { lineHeight: '1.7' };
+const CONTENT       = { padding: '16px 24px', maxWidth: '720px' };
 
 const DEFAULT_FONT_FAMILY = "'JetBrains Mono', 'Fira Code', monospace";
 
@@ -86,9 +88,15 @@ function makeFontTheme(fontFamily: string) {
 }
 
 
-const editorColorCompartment = new Compartment();
-const editorFontCompartment  = new Compartment();
-const spellCheckCompartment  = new Compartment();
+const editorColorCompartment    = new Compartment();
+const editorFontCompartment     = new Compartment();
+const editorFontSizeCompartment = new Compartment();
+const lineWrapCompartment       = new Compartment();
+const spellCheckCompartment     = new Compartment();
+
+function makeFontSizeTheme(size: number) {
+  return EditorView.theme({ '.cm-scroller': { fontSize: `${size}px` } });
+}
 
 // ── Star-group helpers (for bold/italic which share the * character) ────────
 
@@ -474,11 +482,12 @@ interface ContextMenuState { x: number; y: number; hasSelection: boolean; clickP
 interface ConfirmState { title: string; message: string; okLabel: string; resolve: (ok: boolean) => void }
 
 export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
-  { content, onChange, onCursorSlide, onWarn, onSaveAs, focusMode = false, filePath, uiTheme = 'dark', editorFontFamily = DEFAULT_FONT_FAMILY, spellCheckEnabled = false, spellCheckLanguage = 'en_US' }: Props,
+  { content, onChange, onCursorSlide, onWarn, onSaveAs, focusMode = false, filePath, uiTheme = 'dark', editorFontFamily = DEFAULT_FONT_FAMILY, wordWrap = true, spellCheckEnabled = false, spellCheckLanguage = 'en_US' }: Props,
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const fontSizeRef = useRef(DEFAULT_FONT_SIZE);
   const onChangeRef = useRef(onChange);
   const onCursorSlideRef = useRef(onCursorSlide);
   const onWarnRef = useRef(onWarn);
@@ -616,7 +625,8 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
           uiThemeRef.current === 'light' ? editorLightTheme : [oneDark, editorDarkTheme]
         ),
         editorFontCompartment.of(makeFontTheme(editorFontFamily)),
-        EditorView.lineWrapping,
+        editorFontSizeCompartment.of(makeFontSizeTheme(DEFAULT_FONT_SIZE)),
+        lineWrapCompartment.of(wordWrap ? EditorView.lineWrapping : []),
         markdown({ codeLanguages: languages }),
         Prec.high(keymap.of([
           indentWithTab,
@@ -633,6 +643,29 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
           { key: 'Mod-4', run: makeHeadingCommand(4) },
           { key: 'Mod-5', run: makeHeadingCommand(5) },
           { key: 'Mod-6', run: makeHeadingCommand(6) },
+          {
+            key: 'Mod-=', run: (view) => {
+              const next = Math.min(36, fontSizeRef.current + 2);
+              fontSizeRef.current = next;
+              view.dispatch({ effects: editorFontSizeCompartment.reconfigure(makeFontSizeTheme(next)) });
+              return true;
+            },
+          },
+          {
+            key: 'Mod--', run: (view) => {
+              const next = Math.max(8, fontSizeRef.current - 2);
+              fontSizeRef.current = next;
+              view.dispatch({ effects: editorFontSizeCompartment.reconfigure(makeFontSizeTheme(next)) });
+              return true;
+            },
+          },
+          {
+            key: 'Mod-0', run: (view) => {
+              fontSizeRef.current = DEFAULT_FONT_SIZE;
+              view.dispatch({ effects: editorFontSizeCompartment.reconfigure(makeFontSizeTheme(DEFAULT_FONT_SIZE)) });
+              return true;
+            },
+          },
         ])),
         updateListener,
         focusModeCompartment.of([]),
@@ -910,6 +943,25 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
     return () => el.removeEventListener('keydown', handler, { capture: true });
   }, []);
 
+  // Ctrl+scroll to zoom editor font size
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const view = viewRef.current;
+      if (!view) return;
+      const delta = e.deltaY > 0 ? -2 : 2;
+      const next = Math.max(8, Math.min(36, fontSizeRef.current + delta));
+      if (next === fontSizeRef.current) return;
+      fontSizeRef.current = next;
+      view.dispatch({ effects: editorFontSizeCompartment.reconfigure(makeFontSizeTheme(next)) });
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
   // Sync external content changes
   useEffect(() => {
     const view = viewRef.current;
@@ -926,6 +978,13 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
       effects: focusModeCompartment.reconfigure(focusModeExtension(focusMode)),
     });
   }, [focusMode]);
+
+  // Toggle line wrapping when prop changes
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: lineWrapCompartment.reconfigure(wordWrap ? EditorView.lineWrapping : []),
+    });
+  }, [wordWrap]);
 
   // Manage spell check extension
   useEffect(() => {

@@ -46,6 +46,7 @@ export interface AppSettings {
   laserColor: LaserColor;
   // Editor
   showFrontmatter: boolean;
+  editorWordWrap: boolean;
   // Presentation defaults
   defaultThemeId: string;
   // Startup
@@ -71,6 +72,7 @@ function buildDefaults(): AppSettings {
     presenterNotesFontSize: 'md',
     laserColor: '#ff2020',
     showFrontmatter: false,
+    editorWordWrap: true,
     defaultThemeId: 'light',
     // Preserves existing behaviour (always launch blank) for anyone upgrading
     // — this only changes anything for users who explicitly opt in.

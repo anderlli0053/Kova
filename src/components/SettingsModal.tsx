@@ -353,6 +353,12 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
           control={<Toggle checked={settings.showFrontmatter} onChange={(v) => set('showFrontmatter', v)} />}
         />
 
+        <Row
+          label="Word wrap"
+          description="Wrap long lines in the editor. When off, a horizontal scrollbar appears for lines wider than the panel."
+          control={<Toggle checked={settings.editorWordWrap} onChange={(v) => set('editorWordWrap', v)} />}
+        />
+
         <div style={{ padding: '10px 0' }}>
           <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>Default presentation theme</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
