@@ -578,7 +578,7 @@ function normaliseTheme(id: string, raw: Record<string, unknown>): Theme {
   const header = (raw.header as Partial<ThemeHeader>) ?? {};
   const footer = (raw.footer as Partial<ThemeFooter>) ?? {};
   const rawLogo = raw.logo as string | undefined;
-  const logo = rawLogo && /^(https?:|data:image\/)/.test(rawLogo) ? rawLogo : undefined;
+  const logo = rawLogo && /^(https?:|data:image\/|\/|[A-Za-z]:[/\\])/.test(rawLogo) ? rawLogo : undefined;
   const bundledFonts = Array.isArray(raw.bundledFonts)
     ? (raw.bundledFonts as unknown[]).filter((f): f is string => typeof f === 'string')
     : undefined;

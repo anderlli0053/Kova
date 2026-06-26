@@ -286,7 +286,7 @@ export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, total
             <img src={theme.logo} alt="Logo" className="sl-logo"
               style={{
                 opacity: theme.logo_opacity,
-                ...(theme.logo_position === 'top-right' ? { marginLeft: 'auto' } : {}),
+                ...(theme.logo_position === 'top-right' ? { marginLeft: 'auto', order: 2 } : {}),
               }} />
           )}
           {headerText && <span className="sl-header-text">{headerText}</span>}

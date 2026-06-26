@@ -176,11 +176,18 @@ export default function App() {
     return { ...merged, logo: resolvedLogoUrl };
   }, [allThemes, activeThemeId, themeOverrides, resolvedLogoUrl]);
 
-  // Register any bundled fonts declared by the active theme
-  // Resolve the raw logo filesystem path to a data URL via IPC so the image
-  // works in both windows regardless of asset-protocol scope restrictions.
+  // Effective raw logo: override wins; fall back to the base theme's logo when
+  // the user hasn't explicitly set or cleared it in this session.
+  const rawLogoSrc = useMemo(() => {
+    if ('logo' in themeOverrides) return themeOverrides.logo;
+    const base = allThemes.find((t) => t.id === activeThemeId) ?? DEFAULT_THEME;
+    return base.logo;
+  }, [themeOverrides, allThemes, activeThemeId]);
+
+  // Resolve the raw logo path to a data URL via IPC so the image works in both
+  // windows regardless of asset-protocol scope restrictions on Windows.
   useEffect(() => {
-    const raw = themeOverrides.logo;
+    const raw = rawLogoSrc;
     if (!raw) { setResolvedLogoUrl(undefined); return; }
     if (/^(https?:|data:)/i.test(raw)) { setResolvedLogoUrl(raw); return; }
     const ext  = raw.replace(/\\/g, '/').split('.').pop()?.toLowerCase() ?? 'png';
@@ -192,7 +199,7 @@ export default function App() {
     invoke<string>('read_file_b64', { path: raw })
       .then((b64) => setResolvedLogoUrl(`data:${mime};base64,${b64}`))
       .catch(() => setResolvedLogoUrl(undefined));
-  }, [themeOverrides.logo]);
+  }, [rawLogoSrc]);
 
   useEffect(() => {
     if (activeTheme.bundledFonts?.length) {
