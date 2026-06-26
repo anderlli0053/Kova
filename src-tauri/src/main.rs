@@ -18,29 +18,17 @@ extern "C" {
         symbol: *const std::os::raw::c_char,
     ) -> *mut std::os::raw::c_void;
     fn dlclose(handle: *mut std::os::raw::c_void) -> std::os::raw::c_int;
-
-    // WebKitGTK C API — linked transitively through the webkit2gtk dep.
-    fn webkit_web_context_get_default() -> *mut std::os::raw::c_void;
-    fn webkit_web_context_set_sandbox_enabled(
-        context: *mut std::os::raw::c_void,
-        enabled: std::os::raw::c_int,
-    );
 }
 
-// Probes whether EGL can actually create a Wayland platform display.
+// Probes whether EGL can actually open a Wayland platform display.
+// Used on native (non-AppImage) Wayland installs to detect broken EGL stacks
+// (e.g. VM GPU drivers) and fall back to Mesa llvmpipe before WebKit starts.
 //
-// The AppImage bundles WebKitGTK built on Ubuntu 22.04, which calls
-// eglGetPlatformDisplayEXT(EGL_PLATFORM_WAYLAND_EXT, wl_display, NULL) against
-// whatever libEGL.so.1 is on the host system. On Fedora 44 with Mesa 26.x and
-// virtual GPU drivers (virgl, vmwgfx), Mesa advertises EGL_EXT_platform_wayland
-// in the extension string but the actual display creation fails with
-// EGL_BAD_PARAMETER, aborting the WebKit web process before the window appears.
-//
-// We replicate the exact call WebKit makes — connecting to the Wayland compositor
-// ourselves and attempting eglGetPlatformDisplayEXT — so we detect real failures
-// rather than just checking whether the extension string mentions the platform.
-// If it fails, LIBGL_ALWAYS_SOFTWARE=1 forces Mesa llvmpipe, whose EGL reliably
-// supports the Wayland platform on all compositors.
+// Note: this probe is not applied to AppImage builds. The AppImage bundles
+// WebKitGTK compiled on Ubuntu 22.04 whose WebProcess crashes on non-Ubuntu
+// EGL stacks regardless of env vars — the bubblewrap sandbox filters out
+// LIBGL_ALWAYS_SOFTWARE before it reaches the subprocess. A proper fix is
+// in progress upstream: https://github.com/tauri-apps/tauri/pull/12491
 #[cfg(target_os = "linux")]
 fn egl_wayland_display_works() -> bool {
     use std::ffi::{CStr, CString};
@@ -70,7 +58,7 @@ fn egl_wayland_display_works() -> bool {
     unsafe {
         let wl_handle = dlopen(wl_lib.as_ptr(), 1 /* RTLD_LAZY */);
         if wl_handle.is_null() {
-            return true; // Can't load Wayland — not our problem
+            return true;
         }
 
         let egl_handle = dlopen(egl_lib.as_ptr(), 1 /* RTLD_LAZY */);
@@ -84,15 +72,12 @@ fn egl_wayland_display_works() -> bool {
         let egl_get_platform_ptr = load_sym!(egl_handle, "eglGetPlatformDisplayEXT");
         let egl_query_ptr = load_sym!(egl_handle, "eglQueryString");
 
-        // Without the platform display function we can't replicate WebKit's call
         if egl_get_platform_ptr.is_null() || wl_connect_ptr.is_null() {
             dlclose(egl_handle);
             dlclose(wl_handle);
             return true;
         }
 
-        // Fast path: if EGL_EXT_platform_wayland isn't even in the client
-        // extension string the display creation will definitely fail.
         if !egl_query_ptr.is_null() {
             let query: EglQueryStringFn = std::mem::transmute(egl_query_ptr);
             let ext_ptr = query(std::ptr::null_mut(), 0x3055 /* EGL_EXTENSIONS */);
@@ -111,14 +96,10 @@ fn egl_wayland_display_works() -> bool {
             }
         }
 
-        // Extension is advertised — now actually attempt the call WebKit makes.
-        // Our Wayland connection is independent of GTK's; connecting a second
-        // client to the same compositor is safe and normal.
         let wl_connect: WlDisplayConnectFn = std::mem::transmute(wl_connect_ptr);
-        let wl_display = wl_connect(std::ptr::null()); // NULL → use WAYLAND_DISPLAY
+        let wl_display = wl_connect(std::ptr::null());
 
         if wl_display.is_null() {
-            // Can't reach the compositor at all — not an EGL issue
             dlclose(egl_handle);
             dlclose(wl_handle);
             return true;
@@ -142,76 +123,34 @@ fn egl_wayland_display_works() -> bool {
 fn main() {
     // Must be called before any X11 calls are made from any thread.
     // Without this, opening a second window (presentation mode) triggers an
-    // XCB multi-thread assertion crash on X11 sessions (Ubuntu 22.04, etc.).
+    // XCB multi-thread assertion crash on X11 sessions.
     #[cfg(target_os = "linux")]
     unsafe {
         XInitThreads();
     }
 
     // WebKitGTK 2.42+ enables the DMA-BUF renderer by default, which fails
-    // with EGL_BAD_DISPLAY on some AMD GPU configurations (Arch-based distros
-    // like CachyOS). Must be set before the webview is created.
-    // Respect any explicit override the user has already set.
+    // with EGL_BAD_DISPLAY on some wlroots-based Wayland compositors (Arch,
+    // CachyOS). Must be set before the webview is created.
     #[cfg(target_os = "linux")]
     if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
 
+    // On native (non-AppImage) Wayland sessions, probe whether the host EGL
+    // stack can create a Wayland platform display. If not (broken VM GPU
+    // drivers, etc.), fall back to Mesa llvmpipe before WebKit launches.
+    // AppImage builds are excluded: the bubblewrap sandbox filters
+    // LIBGL_ALWAYS_SOFTWARE before it reaches the WebKitWebProcess subprocess,
+    // so it has no effect. The AppImage EGL portability issue is tracked at
+    // https://github.com/tauri-apps/tauri/pull/12491 (Tauri 2.12).
     #[cfg(target_os = "linux")]
-    if std::env::var("APPIMAGE").is_ok() {
-        eprintln!("[kova] AppImage detected — applying EGL workarounds");
-
-        // The bundled WebKitWebProcess calls eglGetPlatformDisplayEXT
-        // unconditionally on startup. On non-Ubuntu EGL stacks this can fail
-        // with EGL_BAD_PARAMETER. LIBGL_ALWAYS_SOFTWARE forces Mesa llvmpipe
-        // which has a more compatible EGL platform implementation.
-        // GDK_BACKEND=x11 + removing WAYLAND_DISPLAY routes both GTK and
-        // WebKit's internal display init through XWayland (X11 EGL) rather
-        // than Wayland EGL, which is less reliable on non-Ubuntu stacks.
-        if std::env::var("LIBGL_ALWAYS_SOFTWARE").is_err() {
-            std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1");
-        }
-        if std::env::var("DISPLAY").is_ok() {
-            if std::env::var("GDK_BACKEND").is_err() {
-                std::env::set_var("GDK_BACKEND", "x11");
-            }
-            if std::env::var("GDK_BACKEND").ok().as_deref() == Some("x11") {
-                std::env::remove_var("WAYLAND_DISPLAY");
-            }
-        }
-
-        eprintln!("[kova]   LIBGL_ALWAYS_SOFTWARE           = {}",
-            std::env::var("LIBGL_ALWAYS_SOFTWARE").as_deref().unwrap_or("(unset)"));
-        eprintln!("[kova]   WEBKIT_DISABLE_DMABUF_RENDERER  = {}",
-            std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").as_deref().unwrap_or("(unset)"));
-        eprintln!("[kova]   GDK_BACKEND                     = {}",
-            std::env::var("GDK_BACKEND").as_deref().unwrap_or("(unset)"));
-        eprintln!("[kova]   WAYLAND_DISPLAY                 = {}",
-            std::env::var("WAYLAND_DISPLAY").as_deref().unwrap_or("(unset)"));
-        eprintln!("[kova]   DISPLAY                         = {}",
-            std::env::var("DISPLAY").as_deref().unwrap_or("(unset)"));
-
-        // WebKitGTK's bubblewrap sandbox cannot resolve paths correctly when
-        // the parent process runs from an AppImage mount point.
-        let _ = gtk::init();
-        unsafe {
-            let ctx = webkit_web_context_get_default();
-            eprintln!("[kova]   webkit_web_context_get_default  = {:?}", ctx);
-            if !ctx.is_null() {
-                webkit_web_context_set_sandbox_enabled(ctx, 0);
-                eprintln!("[kova]   sandbox disabled");
-            }
-        }
-    } else {
-        // Native install: if the host EGL can't create a Wayland platform
-        // display (VM with broken GPU drivers, etc.) fall back to llvmpipe.
-        #[cfg(target_os = "linux")]
-        if std::env::var("WAYLAND_DISPLAY").is_ok()
-            && std::env::var("LIBGL_ALWAYS_SOFTWARE").is_err()
-            && !egl_wayland_display_works()
-        {
-            std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1");
-        }
+    if std::env::var("APPIMAGE").is_err()
+        && std::env::var("WAYLAND_DISPLAY").is_ok()
+        && std::env::var("LIBGL_ALWAYS_SOFTWARE").is_err()
+        && !egl_wayland_display_works()
+    {
+        std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1");
     }
 
     kova_lib::run()
