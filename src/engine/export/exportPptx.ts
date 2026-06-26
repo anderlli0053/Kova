@@ -301,6 +301,7 @@ function addSlide(
   if (hasHead) addHeaderBar(s, t, meta);
   if (hasFoot) addFooterBar(s, t, meta, H);
   if (logoDataUrl) addLogo(s, logoDataUrl, logoAr, t.logo_position, t.logo_opacity, H);
+  if (slide.references.length > 0) addReferences(s, slide.references, t, H, hasFoot);
   if (slide.speakerNotes) s.addNotes(slide.speakerNotes);
 }
 
@@ -665,6 +666,35 @@ function addCodeSlide(s: PS, slide: Slide, t: Theme, cy: number, ch: number, war
 
 function addBlankSlide(s: PS, t: Theme) {
   s.background = { fill: hex(t.colors.background) };
+}
+
+// ── Academic references ───────────────────────────────────────────────────────
+
+function blendColor(fg: string, bg: string, alpha: number): string {
+  const parse = (c: string) => [parseInt(c.slice(0,2),16), parseInt(c.slice(2,4),16), parseInt(c.slice(4,6),16)];
+  const [fr, fg2, fb] = parse(hex(fg));
+  const [br, bg2, bb] = parse(hex(bg));
+  const r = Math.round(fr * alpha + br * (1 - alpha));
+  const g = Math.round(fg2 * alpha + bg2 * (1 - alpha));
+  const b = Math.round(fb * alpha + bb * (1 - alpha));
+  return [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+function addReferences(s: PS, refs: string[], t: Theme, H: number, hasFoot: boolean) {
+  const REF_H = 0.06 + refs.length * 0.17;
+  const bottomPad = hasFoot ? FOOT_H + 0.08 : 0.15;
+  const color = blendColor(t.colors.text, t.colors.background, 0.60);
+  const runs = refs.map((ref, i) => ({
+    text: ref,
+    options: { fontSize: 7, breakLine: i < refs.length - 1, color },
+  }));
+  s.addText(runs, {
+    x: W / 2, y: H - bottomPad - REF_H, w: W / 2 - M, h: REF_H,
+    fontSize: 7, color,
+    fontFace: firstFont(t.fonts.body),
+    align: 'right', valign: 'bottom',
+    wrap: true,
+  });
 }
 
 // ── Header / Footer bars ──────────────────────────────────────────────────────

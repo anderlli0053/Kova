@@ -54,7 +54,7 @@ function parseSlide(raw: string, index: number): Slide {
   // Preprocess before speaker-notes extraction so ??? inside custom URLs is not
   // misinterpreted as speaker-note markers. Custom elements become inline HTML
   // comment placeholders so remark preserves their position in the element list.
-  const { cleanContent, placeholders } = preprocess(raw);
+  const { cleanContent, placeholders, references } = preprocess(raw);
   const { content, notes } = extractSpeakerNotes(cleanContent);
 
   const tree = processor.parse(content) as Root;
@@ -62,7 +62,7 @@ function parseSlide(raw: string, index: number): Slide {
 
   const layout = layoutOverride ?? detectLayout(elements, titleLevel, !!title);
 
-  return { index, raw, title, titleLevel, elements, speakerNotes: notes, layout, layoutOverride, hidden };
+  return { index, raw, title, titleLevel, elements, speakerNotes: notes, references, layout, layoutOverride, hidden };
 }
 
 // ── Custom syntax pre-processor ──────────────────────────────────────────────
@@ -70,17 +70,20 @@ function parseSlide(raw: string, index: number): Slide {
 interface PreprocessResult {
   cleanContent: string;
   placeholders: Map<number, SlideElement>;
+  references: string[];
 }
 
 const YOUTUBE_RE      = /^!youtube\[([^\]]*)\]\(([^)]*)\)$/;
 const POLL_RE         = /^!poll\[([^\]]*)\]\(([^)]*)\)$/;
 const PROGRESS_RE     = /^!progress\[([^\]]*)\]\((\d+(?:\.\d+)?)\)$/;
+const REF_RE          = /^!ref\[([^\]]*)\]$/;
 // remark-math v6 only recognises block math when $$ appears on its own line.
 // Normalise single-line $$...$$ → multi-line so it is parsed as a math block.
 const DISPLAY_MATH_RE = /^\$\$(.+)\$\$\s*$/;
 
 function preprocess(content: string): PreprocessResult {
   const placeholders = new Map<number, SlideElement>();
+  const references: string[] = [];
   let nextIdx = 0;
   const cleanLines: string[] = [];
 
@@ -116,6 +119,12 @@ function preprocess(content: string): PreprocessResult {
       continue;
     }
 
+    const ref = t.match(REF_RE);
+    if (ref) {
+      references.push(ref[1]);
+      continue;
+    }
+
     // Strip layout override + hidden comments (already captured above)
     if (/^<!--\s*layout:/.test(t)) continue;
     if (/^<!--\s*hidden\s*-->$/.test(t)) continue;
@@ -130,7 +139,7 @@ function preprocess(content: string): PreprocessResult {
     cleanLines.push(line);
   }
 
-  return { cleanContent: cleanLines.join('\n').trim(), placeholders };
+  return { cleanContent: cleanLines.join('\n').trim(), placeholders, references };
 }
 
 // ── mdast → SlideElement converter ───────────────────────────────────────────

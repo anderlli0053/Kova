@@ -581,6 +581,29 @@
 .sl-bsp__subpane .sl-math,
 .sl-two-col__col .sl-math { font-size: clamp(12px, 5cqi, 60px); }
 
+/* ── Academic references ─────────────────────────────────────────────────── */
+
+.sl-references {
+  position: absolute;
+  bottom: 1.5cqi;
+  right: 3cqi;
+  z-index: 5;
+  max-width: 55%;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2em;
+  pointer-events: none;
+}
+
+.sl-reference {
+  font-family: var(--sl-font-body);
+  font-size: clamp(5px, 1.05cqi, 9px);
+  color: color-mix(in srgb, var(--sl-text) 60%, var(--sl-bg));
+  line-height: 1.3;
+}
+
 /* ── Overflow badge ──────────────────────────────────────────────────────── */
 
 .sl-overflow-badge {
