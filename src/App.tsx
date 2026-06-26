@@ -60,10 +60,10 @@ function resolveImageSrc(src: string, docDir: string): string {
   let p = src;
   try { p = decodeURIComponent(src); } catch { /* malformed — use as-is */ }
   // Already absolute — convert directly, no docDir needed.
-  if (p.startsWith('/') || /^[A-Za-z]:[/\\]/.test(p)) return convertFileSrc(p);
+  if (p.startsWith('/') || /^[A-Za-z]:[/\\]/.test(p)) return convertFileSrc(p.replace(/\\/g, '/'));
   // Relative path — only resolvable when we know the document location.
   if (!docDir) return p;
-  return convertFileSrc(normalizePath(docDir, p));
+  return convertFileSrc(normalizePath(docDir, p).replace(/\\/g, '/'));
 }
 
 function resolveHtmlSrcs(html: string, docDir: string): string {

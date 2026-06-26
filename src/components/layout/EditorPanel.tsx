@@ -43,7 +43,7 @@ interface Props {
 function makeRelativePath(docPath: string, target: string): string {
   const sep = docPath.includes('\\') ? '\\' : '/';
   const docParts = docPath.split(sep).slice(0, -1);
-  const tgtParts = target.split(sep.includes('\\') ? /[/\\]/ : '/');
+  const tgtParts = target.split(/[/\\]/);
   let common = 0;
   while (common < docParts.length && common < tgtParts.length && docParts[common] === tgtParts[common]) common++;
   const up = docParts.length - common;
