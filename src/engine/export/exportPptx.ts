@@ -1153,58 +1153,37 @@ function addElements(s: PS, elements: SlideElement[], t: Theme, area: Area, warn
     const textFrac = runs.length > 0 ? Math.min(0.5, 0.15 + runs.length * 0.08) : 0;
     const tableY = area.y + area.h * textFrac;
     const tableH = area.h * (1 - textFrac - 0.02);
-    addTable(s, tableEl, t, { x: area.x, y: tableY, w: area.w, h: tableH }, warnings);
+    addTable(s, tableEl, t, { x: area.x, y: tableY, w: area.w, h: tableH });
   }
 }
-
-// Rough estimate of a single table row's rendered height at fontSize 14 with
-// PptxGenJS's default cell margins — used only to decide whether to warn that
-// autoPage will likely split the table across additional slides.
-const EST_ROW_H = 0.35;
 
 function addTable(
   s: PS,
   el: Extract<SlideElement, { type: 'table' }>,
   t: Theme,
   area: Area,
-  warnings: string[],
 ) {
-  const headerRow = el.headers.map((h) => ({
+  const colAlign = (i: number): 'left' | 'center' | 'right' =>
+    (el.align?.[i] as 'left' | 'center' | 'right' | null | undefined) ?? 'left';
+
+  const headerRow = el.headers.map((h, i) => ({
     text: h,
     options: {
       bold: true,
       color: hex(t.colors.title_text),
       fill: { color: hex(t.colors.primary) },
-      align: 'center' as const,
+      align: colAlign(i),
     },
   }));
   const bodyRows = el.rows.map((row) =>
-    row.map((cell) => ({ text: cell, options: { color: hex(t.colors.text), fontSize: 14 } }))
+    row.map((cell, i) => ({ text: cell, options: { color: hex(t.colors.text), fontSize: 14, align: colAlign(i) } }))
   );
-
-  const estimatedH = (el.rows.length + 1) * EST_ROW_H;
-  if (estimatedH > area.h) {
-    warnings.push(
-      `Table with ${el.rows.length} rows (header: "${el.headers.join(', ')}") is too tall for its slide and was ` +
-      'split across additional slides by PowerPoint auto-paging — those continuation slides will not have the ' +
-      'theme background, header, or footer applied.',
-    );
-  }
 
   s.addTable([headerRow, ...bodyRows], {
     x: area.x, y: area.y, w: area.w, h: area.h,
     fontSize: 14,
     fontFace: firstFont(t.fonts.body),
     border: { color: hex(t.colors.accent), pt: 0.5 },
-    // Without autoPage, a table taller than `h` just overflows the slide edge
-    // with no indication anything is missing. autoPage instead creates
-    // additional slides to hold the remaining rows (repeating the header row
-    // on each) — those continuation slides are plain PptxGenJS slides, not
-    // run through addSlide(), so they won't carry Kova's background/
-    // header/footer/logo. Still strictly better than silently losing rows.
-    autoPage: true,
-    autoPageRepeatHeader: true,
-    autoPageHeaderRows: 1,
   });
 }
 
