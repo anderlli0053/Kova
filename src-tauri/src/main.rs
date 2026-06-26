@@ -159,15 +159,27 @@ fn main() {
 
     #[cfg(target_os = "linux")]
     if std::env::var("APPIMAGE").is_ok() {
-        // The AppImage bundles WebKitGTK compiled on Ubuntu 22.04. When that
-        // binary runs against a non-Ubuntu EGL stack (Fedora Mesa 26.x, etc.)
-        // it fails with EGL_BAD_PARAMETER trying to create a Wayland display.
-        // Forcing GDK to the X11 backend makes everything render through
-        // XWayland instead, sidestepping EGL entirely. Only apply when an X11
-        // display is actually available (DISPLAY set by XWayland), so we don't
-        // break hypothetical pure-Wayland setups without XWayland.
-        if std::env::var("GDK_BACKEND").is_err() && std::env::var("DISPLAY").is_ok() {
-            std::env::set_var("GDK_BACKEND", "x11");
+        // The AppImage bundles WebKitGTK compiled on Ubuntu 22.04. Its
+        // Wayland EGL path (eglGetPlatformDisplayEXT EGL_PLATFORM_WAYLAND_EXT)
+        // fails with EGL_BAD_PARAMETER on non-Ubuntu EGL stacks (Fedora Mesa
+        // 26.x, virgl/vmwgfx VMs, etc.), aborting the WebProcess.
+        //
+        // Two env vars together fix it when XWayland is available:
+        // - GDK_BACKEND=x11  → GTK uses the X11 display backend
+        // - unset WAYLAND_DISPLAY → WebKit's internal platform detection also
+        //   falls back to X11 EGL instead of Wayland EGL (WebKit checks this
+        //   independently of GDK, so GDK_BACKEND alone is not enough)
+        //
+        // Guard on DISPLAY so we don't break pure-Wayland setups without XWayland.
+        if std::env::var("DISPLAY").is_ok() {
+            if std::env::var("GDK_BACKEND").is_err() {
+                std::env::set_var("GDK_BACKEND", "x11");
+            }
+            // Only unset if we're actually switching to X11; leave it alone
+            // if the user has forced GDK_BACKEND to something else themselves.
+            if std::env::var("GDK_BACKEND").ok().as_deref() == Some("x11") {
+                std::env::remove_var("WAYLAND_DISPLAY");
+            }
         }
 
         // WebKitGTK's bubblewrap sandbox cannot resolve paths correctly when
