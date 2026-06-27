@@ -76,4 +76,51 @@ describe('importMarp', () => {
     expect(markdown).toContain('# Two');
     expect(markdown.split(/^---$/m).length).toBeGreaterThanOrEqual(2);
   });
+
+  it('maps ![bg right] to split', () => {
+    const { markdown } = importMarp('---\nmarp: true\n---\n![bg right](a.jpg)\n\n# Title');
+    expect(markdown).toContain('<!-- layout:split -->');
+  });
+
+  it('logs bg-sizing when fit/cover modifiers are present', () => {
+    const { dropped } = importMarp('---\nmarp: true\n---\n![bg fit](a.jpg)');
+    expect(dropped).toContain('bg-sizing');
+  });
+
+  it('drops a second background image on the same slide', () => {
+    const { markdown, dropped } = importMarp('---\nmarp: true\n---\n![bg](a.jpg)\n![bg](b.jpg)');
+    expect(dropped).toContain('bg-extra');
+    expect(markdown).toContain('![](a.jpg)');
+    expect(markdown).not.toContain('![](b.jpg)');
+  });
+
+  it('strips Marp image size keywords from alt text', () => {
+    const { markdown, dropped } = importMarp('---\nmarp: true\n---\n![w:200 h:100](photo.jpg)');
+    expect(dropped).toContain('image-size');
+    expect(markdown).toContain('![](photo.jpg)');
+    expect(markdown).not.toContain('w:200');
+  });
+
+  it('does not split slides on --- inside a fenced code block', () => {
+    const deck = [
+      '---', 'marp: true', '---',
+      '# Slide', '',
+      '```', 'line one', '---', 'line two', '```',
+    ].join('\n');
+    const { markdown } = importMarp(deck);
+    expect(markdown).toContain('line one');
+    expect(markdown).toContain('line two');
+    expect(markdown.match(/^# Slide$/m)).toHaveLength(1);
+  });
+
+  it('maps size 16:9 to aspect_ratio', () => {
+    const { markdown } = importMarp('---\nmarp: true\nsize: 16:9\n---\n# X');
+    expect(markdown).toContain('aspect_ratio: "16:9"');
+  });
+
+  it('maps footer text into theme_overrides', () => {
+    const { markdown } = importMarp('---\nmarp: true\nfooter: "Confidential"\n---\n# X');
+    expect(markdown).toContain('footer:');
+    expect(markdown).toContain('"Confidential"');
+  });
 });

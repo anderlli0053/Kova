@@ -175,6 +175,18 @@ describe('element parsing', () => {
     expect(table?.type === 'table' && table.rows[0]).toEqual(['1', '2']);
   });
 
+  it('preserves GFM table column alignments', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      '| Left | Center | Right |',
+      '|:-----|:------:|------:|',
+      '| a | b | c |',
+    ].join('\n')));
+    const table = slides[0].elements.find((e) => e.type === 'table');
+    expect(table?.type === 'table' && table.align).toEqual(['left', 'center', 'right']);
+  });
+
   it('discards whitespace-only paragraphs', () => {
     const { slides } = parseDocument(doc('## Slide\n\n   \n\n- Item\n'));
     const paras = slides[0].elements.filter((e) => e.type === 'paragraph');
@@ -271,6 +283,51 @@ describe('custom syntax pre-processor', () => {
     const bars = slides[0].elements.filter((e) => e.type === 'progress');
     expect(bars).toHaveLength(3);
     expect(bars.map((b) => b.type === 'progress' && b.label)).toEqual(['A', 'B', 'C']);
+  });
+});
+
+// ── Academic references (!ref) ────────────────────────────────────────────────
+
+describe('!ref academic references', () => {
+  it('collects a single reference on the slide', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n!ref[Smith, A. (2022). Journal of Results.]\n'));
+    expect(slides[0].references).toEqual(['Smith, A. (2022). Journal of Results.']);
+  });
+
+  it('collects multiple references in order', () => {
+    const input = doc('## Slide\n\n!ref[First ref]\n!ref[Second ref]\n');
+    const { slides } = parseDocument(input);
+    expect(slides[0].references).toEqual(['First ref', 'Second ref']);
+  });
+
+  it('ignores empty !ref[] lines', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n!ref[]\n!ref[Real ref]\n'));
+    expect(slides[0].references).toEqual(['Real ref']);
+  });
+
+  it('does not emit !ref lines as visible elements', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n- Bullet\n\n!ref[Citation text]\n'));
+    const texts = slides[0].elements.flatMap((e) =>
+      e.type === 'paragraph' ? [e.text] : e.type === 'list' ? e.items.map((i) => i.text) : [],
+    );
+    expect(texts.every((t) => !t.includes('Citation text'))).toBe(true);
+  });
+
+  it('does not treat !ref inside a code fence as a reference', () => {
+    const input = doc('## Slide\n\n```\n!ref[Not a citation]\n```\n\n!ref[Real citation]\n');
+    const { slides } = parseDocument(input);
+    expect(slides[0].references).toEqual(['Real citation']);
+    const code = slides[0].elements.find((e) => e.type === 'code');
+    expect(code?.type === 'code' && code.value).toContain('!ref[Not a citation]');
+  });
+
+  it('keeps references scoped to their slide', () => {
+    const { slides } = parseDocument(doc(
+      '## Alpha\n\n!ref[Alpha citation]\n\n---\n\n## Beta\n\n!ref[Beta citation]\n',
+    ));
+    expect(slides).toHaveLength(2);
+    expect(slides[0].references).toEqual(['Alpha citation']);
+    expect(slides[1].references).toEqual(['Beta citation']);
   });
 });
 
