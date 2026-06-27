@@ -129,6 +129,7 @@ jobs:
             | **macOS** (Apple Silicon + Intel) | `.dmg` | Signed and notarised — double-click to install |
             | **Windows 10/11** | `.msi` or `_x64-setup.exe` | Click **More info → Run anyway** if SmartScreen appears (app is unsigned) |
             | **Linux** | `.deb` (Debian/Ubuntu) or `.rpm` (Fedora/RHEL/openSUSE) | Install via your package manager |
+            | **Linux AppImage** | `.AppImage` | Graphics libs stripped for compatibility with Arch/Fedora/etc. **No auto-update** — re-download manually for future releases. |
 
             > **Beta release** — expect rough edges. Please report bugs via [Issues](../../issues).
           releaseDraft: true    # appears as a draft; publish manually after reviewing the assets
@@ -201,6 +202,36 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Build AppImage separately with createUpdaterArtifacts:false so no signing
+      # key is needed. Graphics libs are stripped (vadika's fix, issue #3) so it
+      # runs on non-Ubuntu hosts. Uploaded as a best-effort community build — the
+      # release notes make clear it has no auto-update.
+      - name: Build and upload AppImage (no auto-update)
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm run tauri build -- --bundles appimage --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          APPIMAGE_DIR="src-tauri/target/release/bundle/appimage"
+          APP=$(ls "$APPIMAGE_DIR"/*.AppImage | head -1)
+          APP_NAME=$(basename "$APP")
+
+          ( cd "$APPIMAGE_DIR"
+            ./"$APP_NAME" --appimage-extract >/dev/null
+            cd squashfs-root/usr/lib && rm -f \
+              libwayland-client.so* libwayland-cursor.so* libwayland-egl.so* libwayland-server.so* \
+              libEGL.so* libGL.so* libGLX.so* libGLdispatch.so* libOpenGL.so* \
+              libGLESv2.so* libgbm.so* libdrm.so* libEGL_mesa.so* libgallium*.so* \
+              && rm -rf dri/ )
+
+          wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          rm -f "$APP"
+          ( cd "$APPIMAGE_DIR" && ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP_NAME" )
+          rm -rf "$APPIMAGE_DIR/squashfs-root"
+
+          gh release upload "${{ github.ref_name }}" "$APP" --clobber
 
   # Runs after all platform builds. Adds stable-named (version-free) download
   # aliases so README links never need updating, then removes .sig files to
@@ -222,7 +253,7 @@ jobs:
 
           gh release download "$TAG" -R KovaMD/Kova \
             -p "*.dmg" -p "*_en-US.msi" -p "*-setup.exe" \
-            -p "*.deb" -p "*.rpm" -p "*_x86_64.tar.gz" \
+            -p "*.deb" -p "*.rpm" -p "*_x86_64.tar.gz" -p "*_amd64.AppImage" \
             -D /tmp/assets --clobber
 
           cp "/tmp/assets/Kova_${VERSION}_universal.dmg"        "/tmp/assets/Kova_macOS.dmg"
@@ -231,6 +262,7 @@ jobs:
           cp "/tmp/assets/Kova_${VERSION}_amd64.deb"            "/tmp/assets/Kova_Linux.deb"
           cp "/tmp/assets/Kova-${VERSION}-1.x86_64.rpm"         "/tmp/assets/Kova_Linux.rpm"
           cp "/tmp/assets/Kova_${VERSION}_x86_64.tar.gz"        "/tmp/assets/Kova_Linux.tar.gz"
+          cp "/tmp/assets/Kova_${VERSION}_amd64.AppImage"       "/tmp/assets/Kova_Linux.AppImage"
 
           gh release upload "$TAG" -R KovaMD/Kova \
             /tmp/assets/Kova_macOS.dmg \
@@ -239,6 +271,7 @@ jobs:
             /tmp/assets/Kova_Linux.deb \
             /tmp/assets/Kova_Linux.rpm \
             /tmp/assets/Kova_Linux.tar.gz \
+            /tmp/assets/Kova_Linux.AppImage \
             --clobber
 
           # Remove .sig files — signatures are embedded in latest.json
