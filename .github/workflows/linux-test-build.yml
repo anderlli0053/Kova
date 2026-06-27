@@ -55,35 +55,43 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build and publish Linux pre-release
-        uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          tagName: ${{ inputs.tag }}
-          releaseName: 'Kova ${{ inputs.tag }} (Linux test build)'
-          releaseBody: |
-            **Linux-only test build — not a general release.**
+      # Throwaway test build — skip updater artifacts so no minisign signing
+      # key is needed (the full release pipeline handles signed updates).
+      - name: Build Linux bundles
+        run: npm run tauri build -- --bundles deb,rpm,appimage --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
-            This build targets a specific bug fix and is intended for users
-            affected by issue #3 (EGL initialisation failure on Wayland).
-            Please report back in that issue whether this resolves the problem.
-          releaseDraft: false
-          prerelease: true
-
-      - name: Fix AppImage — de-bundle libwayland (issue #3)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # linuxdeploy bundles libwayland-* (built on ubuntu-22.04). The host's
+      # Mesa libEGL then loads those stale bundled wayland libs, breaking the
+      # Wayland-EGL handshake → "EGL_BAD_PARAMETER. Aborting..." (issue #3,
+      # confirmed fixed on Arch). Strip them so the AppImage uses host libwayland.
+      # The GL/Mesa/gbm/drm/dri entries below are a defensive denylist — not
+      # currently bundled, but cheap insurance if a future linuxdeploy adds them.
+      - name: De-bundle graphics libs from AppImage
         run: |
           set -euo pipefail
           cd src-tauri/target/release/bundle/appimage
           APP=$(ls *.AppImage | head -1)
           ./"$APP" --appimage-extract >/dev/null
-          rm -f squashfs-root/usr/lib/libwayland-*.so*
+          ( cd squashfs-root/usr/lib && rm -f \
+              libwayland-client.so* libwayland-cursor.so* libwayland-egl.so* libwayland-server.so* \
+              libEGL.so* libGL.so* libGLX.so* libGLdispatch.so* libOpenGL.so* \
+              libGLESv2.so* libgbm.so* libdrm.so* libEGL_mesa.so* libgallium*.so* \
+            && rm -rf dri/ )
           wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x /tmp/appimagetool
           rm -f "$APP"
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP"
-          gh release upload "${{ inputs.tag }}" "$APP" --clobber
+          rm -rf squashfs-root
+
+      - name: Publish pre-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd src-tauri/target/release/bundle
+          gh release create "${{ inputs.tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Kova ${{ inputs.tag }} (Linux test build)" \
+            --prerelease \
+            --notes "Linux-only test build for issue #3. The AppImage has its over-bundled graphics libs (libEGL/Mesa/Wayland) stripped so it uses the host GL/Wayland stack." \
+            deb/*.deb rpm/*.rpm appimage/*.AppImage
