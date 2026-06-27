@@ -22,9 +22,10 @@ jobs:
             args: --target universal-apple-darwin
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-          # Linux — .deb, .rpm, and .AppImage
+          # Linux — .deb and .rpm packages only
+          # AppImage EGL fix in progress; re-enabled once updater signing is resolved.
           - platform: ubuntu-22.04
-            args: '--bundles deb,rpm,appimage'
+            args: '--bundles deb,rpm'
             rust_targets: ''
 
           # Windows 10/11
@@ -190,49 +191,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # linuxdeploy bundles libwayland-* and GL libs (ubuntu-22.04 vintage) into
-      # the AppImage. The host's Mesa libEGL loads those stale bundled libs,
-      # breaking the Wayland-EGL handshake → "EGL_BAD_PARAMETER. Aborting..."
-      # on newer hosts (issue #3). Strip them so the AppImage uses host libs,
-      # then re-sign and patch latest.json so the updater signature stays valid.
-      - name: Fix AppImage — de-bundle graphics libs, re-sign, patch latest.json
-        if: matrix.platform == 'ubuntu-22.04'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          set -euo pipefail
-          APPIMAGE_DIR="src-tauri/target/release/bundle/appimage"
-          APP=$(ls "$APPIMAGE_DIR"/*.AppImage | head -1)
-          APP_NAME=$(basename "$APP")
-
-          # Extract and strip stale graphics libs
-          ( cd "$APPIMAGE_DIR"
-            ./"$APP_NAME" --appimage-extract >/dev/null
-            cd squashfs-root/usr/lib && rm -f \
-              libwayland-client.so* libwayland-cursor.so* libwayland-egl.so* libwayland-server.so* \
-              libEGL.so* libGL.so* libGLX.so* libGLdispatch.so* libOpenGL.so* \
-              libGLESv2.so* libgbm.so* libdrm.so* libEGL_mesa.so* libgallium*.so* \
-              && rm -rf dri/ )
-
-          # Repack
-          wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x /tmp/appimagetool
-          rm -f "$APP"
-          ( cd "$APPIMAGE_DIR" && ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP_NAME" )
-          rm -rf "$APPIMAGE_DIR/squashfs-root"
-
-          # Re-sign with the Tauri signer CLI (installed via npm in the build step)
-          npx tauri signer sign \
-            --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
-            --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
-            "$APP"
-
-          # Upload fixed AppImage; also upload .sig so the finalize job can patch
-          # latest.json after all platforms have finished (avoids a race condition
-          # where clobbering latest.json here invalidates Windows tauri-action's asset ID)
-          gh release upload "${{ github.ref_name }}" "$APP" "$APP.sig" --clobber
 
   # Runs after all platform builds. Adds stable-named (version-free) download
   # aliases so README links never need updating, then removes .sig files to
@@ -244,23 +202,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Patch latest.json with repacked AppImage signature
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          TAG="${{ github.ref_name }}"
-          mkdir -p /tmp/lj
-          gh release download "$TAG" -R KovaMD/Kova -p "latest.json" -D /tmp/lj
-          SIG=$(gh release view "$TAG" -R KovaMD/Kova --json assets \
-            --jq '.assets[] | select(.name | endswith("AppImage.sig")) | .name')
-          gh release download "$TAG" -R KovaMD/Kova -p "$SIG" -D /tmp/lj
-          jq --rawfile sig "/tmp/lj/$SIG" \
-            '.platforms["linux-x86_64"].signature = $sig' \
-            /tmp/lj/latest.json > /tmp/lj/latest.json.new
-          mv /tmp/lj/latest.json.new /tmp/lj/latest.json
-          gh release upload "$TAG" -R KovaMD/Kova /tmp/lj/latest.json --clobber
-
       - name: Add stable download aliases and remove .sig files
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -271,7 +212,7 @@ jobs:
 
           gh release download "$TAG" -R KovaMD/Kova \
             -p "*.dmg" -p "*_en-US.msi" -p "*-setup.exe" \
-            -p "*.deb" -p "*.rpm" -p "*_x86_64.tar.gz" -p "*_amd64.AppImage" \
+            -p "*.deb" -p "*.rpm" -p "*_x86_64.tar.gz" \
             -D /tmp/assets --clobber
 
           cp "/tmp/assets/Kova_${VERSION}_universal.dmg"        "/tmp/assets/Kova_macOS.dmg"
@@ -280,7 +221,6 @@ jobs:
           cp "/tmp/assets/Kova_${VERSION}_amd64.deb"            "/tmp/assets/Kova_Linux.deb"
           cp "/tmp/assets/Kova-${VERSION}-1.x86_64.rpm"         "/tmp/assets/Kova_Linux.rpm"
           cp "/tmp/assets/Kova_${VERSION}_x86_64.tar.gz"        "/tmp/assets/Kova_Linux.tar.gz"
-          cp "/tmp/assets/Kova_${VERSION}_amd64.AppImage"       "/tmp/assets/Kova_Linux.AppImage"
 
           gh release upload "$TAG" -R KovaMD/Kova \
             /tmp/assets/Kova_macOS.dmg \
@@ -289,7 +229,6 @@ jobs:
             /tmp/assets/Kova_Linux.deb \
             /tmp/assets/Kova_Linux.rpm \
             /tmp/assets/Kova_Linux.tar.gz \
-            /tmp/assets/Kova_Linux.AppImage \
             --clobber
 
           # Remove .sig files — signatures are embedded in latest.json
