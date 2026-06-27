@@ -104,11 +104,21 @@ jobs:
           releaseBody: |
             ## What's new
 
+            ### New features
+            - **Academic references** — cite sources with `!ref[Author, Year. Title]`; renders as small bottom-right text on the slide and exports to PPTX.
+            - **Slide hiding** — hide individual slides from presentation and export via a right-click context menu on slide thumbnails. Hidden slides are dimmed in the panel with a one-click eye toggle.
+            - **Native macOS integration** — native traffic-light window controls, system menu bar (File / Edit / View / Window), `.md` file association, and Open Recent submenu.
+            - **Relative image paths** — images referenced with `./` or `../` paths are now resolved relative to the document's directory. Thanks @vadika (#7).
+            - **3-part header/footer layout** — use `|` as a separator to place content left, centre, and right: `{date} | My Deck | {slide_number}/{total}`. Thanks @vadika (#31).
+            - **Resizable next-slide preview** — drag the divider in presenter mode to resize the upcoming-slide panel.
+            - **Editor zoom and word wrap** — zoom the editor font size and toggle word wrap from the toolbar.
+
             ### Bug fixes
-            - **Fixed Mermaid sequence diagram lines invisible on light themes** — `signalColor` was inheriting from `primaryTextColor` (white on light themes), making arrows and lines disappear against the slide background. Now always follows the body text colour. Thanks @a1880 (#26).
-            - **Fixed spellcheck splitting words on umlauts and accents** — the word tokeniser used an ASCII-only regex, so characters like ü, é, and ñ caused words to be split mid-token and incorrectly flagged. The regex now uses Unicode `\p{L}` property escapes and matches all letters correctly. Thanks @mf450s (#21).
-            - **Fixed local images not loading on Windows** — paths with backslashes were passed directly to the asset protocol URL, which WebView2 rejects. Separators are now normalised to forward slashes before building the URL. Drag-and-drop path splitting was also fixed to handle mixed separators from Tauri's dialog and file-drop events. Thanks @codingThome (#25).
-            - **Fixed dock icon appearing larger than neighbours on macOS Sonoma** — the icon artwork filled the canvas edge-to-edge with no transparent margin. Apple HIG requires ~10% safe-area padding on each side; without it Sonoma's dock renderer makes the icon appear oversized relative to well-padded neighbours. Icons have been regenerated with a 10% transparent border on all sides. Thanks @Extiward (#18).
+            - **Fixed paste failing near the end of documents on Windows** — `navigator.clipboard.readText()` returns `\r\n` line endings; CodeMirror normalises these on insert, making the cursor land out of bounds and silently dropping the paste. Thanks @Sl-Alex (#15).
+            - **Fixed markdown table column alignment being ignored** — GFM alignment specs (`:---`, `---:`, `:---:`) were parsed but discarded before reaching the renderer. Thanks @vadika (#24).
+            - **Fixed PPTX export crash and broken PPTX import** — export crash on certain slide content; import now round-trips cleanly.
+            - **Fixed 3-digit hex colours in PPTX export** — shorthand hex values (e.g. `#fff`) were not expanded before channel extraction, producing `NaN` colour values in the output file.
+            - **Fixed logo not preserved when switching themes** — the user-uploaded logo was reset to the theme default on every theme change.
 
             ---
 

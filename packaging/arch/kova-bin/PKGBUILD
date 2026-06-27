@@ -1,6 +1,6 @@
 # Maintainer: RDMillen <rossmillen@protonmail.ch>
 pkgname=kova-bin
-pkgver=0.6.5
+pkgver=0.6.6
 pkgrel=1
 pkgdesc="Markdown presentation authoring tool (pre-built binary)"
 arch=('x86_64')
