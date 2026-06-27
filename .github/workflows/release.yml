@@ -193,6 +193,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # linuxdeploy bundles libwayland-* (ubuntu-22.04 vintage) into the AppImage.
+      # The host's Mesa libEGL then loads those stale wayland libs, breaking the
+      # Wayland-EGL handshake → "EGL_BAD_PARAMETER. Aborting..." on newer hosts
+      # (issue #3, confirmed on Arch). Strip them and repack so the AppImage uses
+      # host libwayland, then clobber the broken one tauri-action already uploaded.
+      - name: Fix AppImage — de-bundle libwayland (issue #3)
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd src-tauri/target/release/bundle/appimage
+          APP=$(ls *.AppImage | head -1)
+          ./"$APP" --appimage-extract >/dev/null
+          rm -f squashfs-root/usr/lib/libwayland-*.so*
+          wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          rm -f "$APP"
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP"
+          gh release upload "${{ github.ref_name }}" "$APP" --clobber
+
   # Runs after all platform builds. Adds stable-named (version-free) download
   # aliases so README links never need updating, then removes .sig files to
   # keep the release page clean for non-technical users.
