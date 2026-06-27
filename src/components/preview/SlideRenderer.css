@@ -73,6 +73,12 @@
 .sl-footer-bar .sl-footer-text { flex: 1; }
 .sl-footer-bar .sl-slide-num { flex-shrink: 0; }
 
+/* `|`-separated header/footer: left | center | right (issue #30) */
+.sl-bar-parts { display: flex; align-items: center; gap: 1cqi; }
+.sl-bar-parts > * { flex: 1; min-width: 0; }
+.sl-bar-parts > :nth-child(2) { text-align: center; }
+.sl-bar-parts > :nth-child(3) { text-align: right; }
+
 /* ── Floating logo (when not in header/footer) ───────────────────────────── */
 
 .sl-logo-float {

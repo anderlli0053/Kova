@@ -146,6 +146,20 @@ function mutedSecondary(primaryHex: string): string {
   return hslToHex(h, Math.min(s, 0.35), l < 0.5 ? Math.min(l + 0.20, 0.45) : Math.max(l - 0.20, 0.55));
 }
 
+// Header/footer text. A `|` stretch separator splits it into left | center | right
+// parts (issue #30); without `|` it renders as a single left-aligned span as before.
+function BarText({ text, className }: { text: string; className: string }) {
+  if (!text.includes('|')) return <span className={className}>{text}</span>;
+  const [left = '', center = '', right = ''] = text.split('|').map((s) => s.trim());
+  return (
+    <span className={`${className} sl-bar-parts`}>
+      <span>{left}</span>
+      <span>{center}</span>
+      <span>{right}</span>
+    </span>
+  );
+}
+
 function buildMermaidInit(theme: Theme): string {
   const c = theme.colors;
   const firstFont = (stack: string) => stack.split(',')[0].trim().replace(/['"]/g, '');
@@ -249,7 +263,7 @@ export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, total
                 ...(theme.logo_position === 'top-right' ? { marginLeft: 'auto' } : {}),
               }} />
           )}
-          {headerText && <span className="sl-header-text">{headerText}</span>}
+          {headerText && <BarText text={headerText} className="sl-header-text" />}
         </div>
       )}
 
@@ -278,7 +292,7 @@ export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, total
                 ...(theme.logo_position === 'bottom-right' ? { marginLeft: 'auto', order: 2 } : {}),
               }} />
           )}
-          {footerText && <span className="sl-footer-text">{footerText}</span>}
+          {footerText && <BarText text={footerText} className="sl-footer-text" />}
           {theme.footer.show_slide_number && slideNumber !== undefined && (
             <span className="sl-slide-num">{slideNumber}</span>
           )}
