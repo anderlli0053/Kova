@@ -241,6 +241,48 @@ describe('inline HTML generation', () => {
   });
 });
 
+// ── Math (KaTeX / remark-math) ────────────────────────────────────────────────
+
+describe('math parsing', () => {
+  it('parses multiline block math as a display math element', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n$$\nE = mc^2\n$$\n'));
+    const math = slides[0].elements.find((e) => e.type === 'math');
+    expect(math?.type === 'math' && math.display).toBe(true);
+    expect(math?.type === 'math' && math.value.trim()).toBe('E = mc^2');
+  });
+
+  it('normalises single-line $$...$$ into block math', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n$$E = mc^2$$\n'));
+    const math = slides[0].elements.find((e) => e.type === 'math');
+    expect(math?.type === 'math' && math.display).toBe(true);
+    expect(math?.type === 'math' && math.value.trim()).toBe('E = mc^2');
+  });
+
+  it('renders inline math as KaTeX HTML inside a paragraph', () => {
+    const { slides } = parseDocument(doc('## Slide\n\nThe equation $x^2$ is quadratic.\n'));
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(slides[0].elements.some((e) => e.type === 'math')).toBe(false);
+    expect(para?.type === 'paragraph' && para.html).toContain('class="katex"');
+    expect(para?.type === 'paragraph' && para.html).toContain('x^2');
+  });
+
+  it('supports block and inline math on the same slide', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n$$\nE = mc^2\n$$\n\nEnergy is $E$.\n'));
+    const math = slides[0].elements.find((e) => e.type === 'math');
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(math?.type === 'math' && math.display).toBe(true);
+    expect(para?.type === 'paragraph' && para.html).toContain('class="katex"');
+  });
+
+  it('does not parse math delimiters inside a code fence', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n```\n$x^2$\n$$\nE=mc^2\n$$\n```\n'));
+    const code = slides[0].elements.find((e) => e.type === 'code');
+    expect(slides[0].elements.some((e) => e.type === 'math')).toBe(false);
+    expect(code?.type === 'code' && code.value).toContain('$x^2$');
+    expect(code?.type === 'code' && code.value).toContain('E=mc^2');
+  });
+});
+
 // ── Custom syntax ─────────────────────────────────────────────────────────────
 
 describe('custom syntax pre-processor', () => {
