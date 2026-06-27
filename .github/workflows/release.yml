@@ -203,26 +203,28 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          cd src-tauri/target/release/bundle/appimage
-          APP=$(ls *.AppImage | head -1)
+          APPIMAGE_DIR="src-tauri/target/release/bundle/appimage"
+          APP=$(ls "$APPIMAGE_DIR"/*.AppImage | head -1)
+          APP_NAME=$(basename "$APP")
 
           # Extract and strip stale graphics libs
-          ./"$APP" --appimage-extract >/dev/null
-          ( cd squashfs-root/usr/lib && rm -f \
+          ( cd "$APPIMAGE_DIR"
+            ./"$APP_NAME" --appimage-extract >/dev/null
+            cd squashfs-root/usr/lib && rm -f \
               libwayland-client.so* libwayland-cursor.so* libwayland-egl.so* libwayland-server.so* \
               libEGL.so* libGL.so* libGLX.so* libGLdispatch.so* libOpenGL.so* \
               libGLESv2.so* libgbm.so* libdrm.so* libEGL_mesa.so* libgallium*.so* \
-            && rm -rf dri/ )
+              && rm -rf dri/ )
 
           # Repack
           wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x /tmp/appimagetool
           rm -f "$APP"
-          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP"
-          rm -rf squashfs-root
+          ( cd "$APPIMAGE_DIR" && ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP_NAME" )
+          rm -rf "$APPIMAGE_DIR/squashfs-root"
 
-          # Re-sign with the Tauri signer CLI (already installed from the build step)
-          cargo tauri signer sign \
+          # Re-sign with the Tauri signer CLI (installed via npm in the build step)
+          npx tauri signer sign \
             --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
             --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
             "$APP"
