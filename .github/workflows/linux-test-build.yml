@@ -72,3 +72,18 @@ jobs:
             Please report back in that issue whether this resolves the problem.
           releaseDraft: false
           prerelease: true
+
+      - name: Fix AppImage — de-bundle libwayland (issue #3)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd src-tauri/target/release/bundle/appimage
+          APP=$(ls *.AppImage | head -1)
+          ./"$APP" --appimage-extract >/dev/null
+          rm -f squashfs-root/usr/lib/libwayland-*.so*
+          wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          rm -f "$APP"
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP"
+          gh release upload "${{ inputs.tag }}" "$APP" --clobber
