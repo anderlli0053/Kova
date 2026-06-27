@@ -1,6 +1,6 @@
 # Kova
 
-> **Note — Linux AppImage temporarily unavailable.** A WebKitGTK bundling incompatibility in the Tauri AppImage builder causes an `EGL_BAD_PARAMETER` crash on non-Ubuntu distributions (Arch, Manjaro, Fedora, Void, etc.). AppImage builds are suspended until the upstream fix lands in [Tauri 2.12](https://github.com/tauri-apps/tauri/pull/12491). In the meantime, `.deb` and `.rpm` packages work correctly on their respective distributions — see [Download](#download) below.
+> **Linux AppImage — no auto-update.** The AppImage bundles Ubuntu 22.04 graphics libs (`libwayland-*`, `libEGL`, Mesa) which conflict with the host GL stack on Arch, Manjaro, Fedora, and other non-Ubuntu distributions, causing an `EGL_BAD_PARAMETER` crash on launch. As of v0.6.6 the AppImage ships with those libs stripped so it uses the host GL stack instead — confirmed working on Arch and Fedora. Because the AppImage is repacked after signing, the updater signature is invalidated and **auto-update is not supported** for the AppImage format. Re-download manually from the [releases page](https://github.com/KovaMD/Kova/releases/latest) when a new version is available. The `.deb` and `.rpm` packages support auto-update normally.
 
 Kova turns plain Markdown into polished slides — with live preview, multiple layouts, theming, and PPTX export — all in a native desktop app.
 
@@ -32,6 +32,7 @@ Kova turns plain Markdown into polished slides — with live preview, multiple l
 | **Windows 10/11** | [**Download .msi**](https://github.com/KovaMD/Kova/releases/latest/download/Kova_Windows.msi) · [Setup .exe](https://github.com/KovaMD/Kova/releases/latest/download/Kova_Windows_setup.exe) |
 | **Linux (Debian/Ubuntu)** | [**.deb package**](https://github.com/KovaMD/Kova/releases/latest/download/Kova_Linux.deb) · [or via package manager](#linux-package-managers) |
 | **Linux (Fedora/RHEL/openSUSE)** | [**.rpm package**](https://github.com/KovaMD/Kova/releases/latest/download/Kova_Linux.rpm) · [or via package manager](#linux-package-managers) |
+| **Linux (AppImage)** | [**.AppImage**](https://github.com/KovaMD/Kova/releases/latest/download/Kova_Linux.AppImage) — no auto-update, see note above |
 
 ## Linux package managers
 
