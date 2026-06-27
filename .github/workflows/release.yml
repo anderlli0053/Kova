@@ -22,12 +22,9 @@ jobs:
             args: --target universal-apple-darwin
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-          # Linux — .deb and .rpm packages only
-          # AppImage excluded: WebKitGTK bundled on Ubuntu 22.04 crashes with
-          # EGL_BAD_PARAMETER on non-Ubuntu EGL stacks. Upstream fix in Tauri 2.12:
-          # https://github.com/tauri-apps/tauri/pull/12491
+          # Linux — .deb, .rpm, and .AppImage
           - platform: ubuntu-22.04
-            args: '--bundles deb,rpm'
+            args: '--bundles deb,rpm,appimage'
             rust_targets: ''
 
           # Windows 10/11
@@ -193,26 +190,55 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # linuxdeploy bundles libwayland-* (ubuntu-22.04 vintage) into the AppImage.
-      # The host's Mesa libEGL then loads those stale wayland libs, breaking the
-      # Wayland-EGL handshake → "EGL_BAD_PARAMETER. Aborting..." on newer hosts
-      # (issue #3, confirmed on Arch). Strip them and repack so the AppImage uses
-      # host libwayland, then clobber the broken one tauri-action already uploaded.
-      - name: Fix AppImage — de-bundle libwayland (issue #3)
+      # linuxdeploy bundles libwayland-* and GL libs (ubuntu-22.04 vintage) into
+      # the AppImage. The host's Mesa libEGL loads those stale bundled libs,
+      # breaking the Wayland-EGL handshake → "EGL_BAD_PARAMETER. Aborting..."
+      # on newer hosts (issue #3). Strip them so the AppImage uses host libs,
+      # then re-sign and patch latest.json so the updater signature stays valid.
+      - name: Fix AppImage — de-bundle graphics libs, re-sign, patch latest.json
         if: matrix.platform == 'ubuntu-22.04'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           cd src-tauri/target/release/bundle/appimage
           APP=$(ls *.AppImage | head -1)
+
+          # Extract and strip stale graphics libs
           ./"$APP" --appimage-extract >/dev/null
-          rm -f squashfs-root/usr/lib/libwayland-*.so*
+          ( cd squashfs-root/usr/lib && rm -f \
+              libwayland-client.so* libwayland-cursor.so* libwayland-egl.so* libwayland-server.so* \
+              libEGL.so* libGL.so* libGLX.so* libGLdispatch.so* libOpenGL.so* \
+              libGLESv2.so* libgbm.so* libdrm.so* libEGL_mesa.so* libgallium*.so* \
+            && rm -rf dri/ )
+
+          # Repack
           wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x /tmp/appimagetool
           rm -f "$APP"
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP"
+          rm -rf squashfs-root
+
+          # Re-sign with Tauri's minisign key
+          sudo apt-get install -y minisign -qq
+          echo "$TAURI_SIGNING_PRIVATE_KEY" | base64 -d > /tmp/tauri.key
+          file /tmp/tauri.key
+          echo "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" | minisign -S -s /tmp/tauri.key -m "$APP" -x "$APP.sig"
+          rm -f /tmp/tauri.key
+
+          # Patch latest.json with the new AppImage signature
+          mkdir -p /tmp/lj
+          gh release download "${{ github.ref_name }}" -p "latest.json" -D /tmp/lj
+          jq --rawfile sig "$APP.sig" \
+            '.platforms["linux-x86_64"].signature = $sig' \
+            /tmp/lj/latest.json > /tmp/lj/latest.json.new
+          mv /tmp/lj/latest.json.new /tmp/lj/latest.json
+
+          # Upload fixed AppImage and patched latest.json
           gh release upload "${{ github.ref_name }}" "$APP" --clobber
+          gh release upload "${{ github.ref_name }}" /tmp/lj/latest.json --clobber
 
   # Runs after all platform builds. Adds stable-named (version-free) download
   # aliases so README links never need updating, then removes .sig files to
@@ -234,7 +260,7 @@ jobs:
 
           gh release download "$TAG" -R KovaMD/Kova \
             -p "*.dmg" -p "*_en-US.msi" -p "*-setup.exe" \
-            -p "*.deb" -p "*.rpm" -p "*_x86_64.tar.gz" \
+            -p "*.deb" -p "*.rpm" -p "*_x86_64.tar.gz" -p "*_amd64.AppImage" \
             -D /tmp/assets --clobber
 
           cp "/tmp/assets/Kova_${VERSION}_universal.dmg"        "/tmp/assets/Kova_macOS.dmg"
@@ -243,6 +269,7 @@ jobs:
           cp "/tmp/assets/Kova_${VERSION}_amd64.deb"            "/tmp/assets/Kova_Linux.deb"
           cp "/tmp/assets/Kova-${VERSION}-1.x86_64.rpm"         "/tmp/assets/Kova_Linux.rpm"
           cp "/tmp/assets/Kova_${VERSION}_x86_64.tar.gz"        "/tmp/assets/Kova_Linux.tar.gz"
+          cp "/tmp/assets/Kova_${VERSION}_amd64.AppImage"       "/tmp/assets/Kova_Linux.AppImage"
 
           gh release upload "$TAG" -R KovaMD/Kova \
             /tmp/assets/Kova_macOS.dmg \
@@ -251,6 +278,7 @@ jobs:
             /tmp/assets/Kova_Linux.deb \
             /tmp/assets/Kova_Linux.rpm \
             /tmp/assets/Kova_Linux.tar.gz \
+            /tmp/assets/Kova_Linux.AppImage \
             --clobber
 
           # Remove .sig files — signatures are embedded in latest.json
