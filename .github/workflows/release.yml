@@ -229,17 +229,10 @@ jobs:
             --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
             "$APP"
 
-          # Patch latest.json with the new AppImage signature
-          mkdir -p /tmp/lj
-          gh release download "${{ github.ref_name }}" -p "latest.json" -D /tmp/lj
-          jq --rawfile sig "$APP.sig" \
-            '.platforms["linux-x86_64"].signature = $sig' \
-            /tmp/lj/latest.json > /tmp/lj/latest.json.new
-          mv /tmp/lj/latest.json.new /tmp/lj/latest.json
-
-          # Upload fixed AppImage and patched latest.json
-          gh release upload "${{ github.ref_name }}" "$APP" --clobber
-          gh release upload "${{ github.ref_name }}" /tmp/lj/latest.json --clobber
+          # Upload fixed AppImage; also upload .sig so the finalize job can patch
+          # latest.json after all platforms have finished (avoids a race condition
+          # where clobbering latest.json here invalidates Windows tauri-action's asset ID)
+          gh release upload "${{ github.ref_name }}" "$APP" "$APP.sig" --clobber
 
   # Runs after all platform builds. Adds stable-named (version-free) download
   # aliases so README links never need updating, then removes .sig files to
@@ -251,6 +244,23 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Patch latest.json with repacked AppImage signature
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          mkdir -p /tmp/lj
+          gh release download "$TAG" -R KovaMD/Kova -p "latest.json" -D /tmp/lj
+          SIG=$(gh release view "$TAG" -R KovaMD/Kova --json assets \
+            --jq '.assets[] | select(.name | endswith("AppImage.sig")) | .name')
+          gh release download "$TAG" -R KovaMD/Kova -p "$SIG" -D /tmp/lj
+          jq --rawfile sig "/tmp/lj/$SIG" \
+            '.platforms["linux-x86_64"].signature = $sig' \
+            /tmp/lj/latest.json > /tmp/lj/latest.json.new
+          mv /tmp/lj/latest.json.new /tmp/lj/latest.json
+          gh release upload "$TAG" -R KovaMD/Kova /tmp/lj/latest.json --clobber
+
       - name: Add stable download aliases and remove .sig files
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
