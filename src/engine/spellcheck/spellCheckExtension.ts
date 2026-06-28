@@ -10,7 +10,7 @@ export function extractWords(doc: string): WordRange[] {
   const result: WordRange[] = [];
   const lines = doc.split('\n');
   let pos = 0;
-  let inFencedCode = false;
+  let fenceChar: string | null = null; // '`' or '~' while inside a code fence
   let inFrontMatter = false;
   let lineIndex = 0;
 
@@ -20,8 +20,14 @@ export function extractWords(doc: string): WordRange[] {
 
     if (lineIndex === 1 && line === '---') { inFrontMatter = true; pos += len + 1; continue; }
     if (inFrontMatter) { if (line === '---' || line === '...') inFrontMatter = false; pos += len + 1; continue; }
-    if (/^(`{3,}|~{3,})/.test(line)) { inFencedCode = !inFencedCode; pos += len + 1; continue; }
-    if (inFencedCode) { pos += len + 1; continue; }
+    const fenceMatch = /^(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch) {
+      const ch = fenceMatch[1][0];
+      if (fenceChar === null) fenceChar = ch;          // open fence
+      else if (fenceChar === ch) fenceChar = null;     // close fence — same char type only
+      pos += len + 1; continue;
+    }
+    if (fenceChar !== null) { pos += len + 1; continue; }
 
     const skip: [number, number][] = [];
     for (const re of [/`[^`]*`/g, /https?:\/\/\S+/g, /!\[[^\]]*\]/g, /\]\([^)]*\)/g, /<[^>]+>/g]) {

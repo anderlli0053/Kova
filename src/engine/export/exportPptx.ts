@@ -62,7 +62,7 @@ function buildExportMermaidInit(t: Theme): string {
   const secondary = diagramMutedSecondary(c.primary);
   const tertiaryBg = c.code_bg;
   const vars = {
-    primaryColor: c.primary, primaryTextColor: c.title_text,
+    primaryColor: c.primary, primaryTextColor: diagramContrastText(c.primary),
     primaryBorderColor: c.primary, lineColor: c.accent,
     secondaryColor: secondary, secondaryTextColor: diagramContrastText(secondary),
     tertiaryColor: tertiaryBg, tertiaryTextColor: diagramContrastText(tertiaryBg),
@@ -700,19 +700,21 @@ function addReferences(s: PS, refs: string[], t: Theme, H: number, hasFoot: bool
 
 // ── Header / Footer bars ──────────────────────────────────────────────────────
 
-// Mirrors the BarText component and .sl-bar-parts CSS (issue #30/#44):
-// a `|` separator splits text into left | center | right equal-width segments.
+// Mirrors the BarText component and .sl-bar-parts CSS (issue #30/#44).
+// Receives pre-split segments (split from the template *before* variable resolution
+// so a doc title containing `|` is never treated as a column separator).
 function addBarText(
   s: PS,
-  text: string,
+  segments: string[],
   x: number, y: number, w: number, h: number,
   fontSize: number, color: string, fontFace: string,
 ) {
-  if (!text.includes('|')) {
-    s.addText(text, { x, y, w, h, fontSize, color, fontFace, align: 'left', valign: 'middle' });
+  if (segments.length <= 1) {
+    s.addText(segments[0] ?? '', { x, y, w, h, fontSize, color, fontFace, align: 'left', valign: 'middle' });
     return;
   }
-  const [left = '', center = '', right = ''] = text.split('|').map((p) => p.trim());
+  const [left = '', center = '', ...rest] = segments;
+  const right = rest.join(' | ');
   const colW = w / 3;
   if (left)   s.addText(left,   { x,            y, w: colW, h, fontSize, color, fontFace, align: 'left',   valign: 'middle' });
   if (center) s.addText(center, { x: x + colW,  y, w: colW, h, fontSize, color, fontFace, align: 'center', valign: 'middle' });
@@ -725,12 +727,10 @@ function addHeaderBar(s: PS, t: Theme, meta: Meta) {
     fill: { color: hex(t.colors.primary) },
     line: { type: 'none' },
   });
-  const text = resolveTemplate(t.header.text, {
-    title: meta.docTitle, date: meta.docDate,
-    slideNumber: meta.slideNum, totalSlides: meta.totalSlides,
-  });
-  if (text) {
-    addBarText(s, text, M, 0, W - M * 2, HEAD_H, 10, hex(t.colors.title_text), firstFont(t.fonts.body));
+  const vars = { title: meta.docTitle, date: meta.docDate, slideNumber: meta.slideNum, totalSlides: meta.totalSlides };
+  const segs = t.header.text.split('|').map((p) => resolveTemplate(p.trim(), vars));
+  if (segs.some(Boolean)) {
+    addBarText(s, segs, M, 0, W - M * 2, HEAD_H, 10, hex(t.colors.title_text), firstFont(t.fonts.body));
   }
 }
 
@@ -744,13 +744,11 @@ function addFooterBar(s: PS, t: Theme, meta: Meta, H: number) {
     line: { type: 'none' },
   });
   const showNum = t.footer.show_slide_number;
-  const text = resolveTemplate(t.footer.text, {
-    title: meta.docTitle, date: meta.docDate,
-    slideNumber: meta.slideNum, totalSlides: meta.totalSlides,
-  });
+  const vars = { title: meta.docTitle, date: meta.docDate, slideNumber: meta.slideNum, totalSlides: meta.totalSlides };
+  const segs = t.footer.text.split('|').map((p) => resolveTemplate(p.trim(), vars));
   const textW = W - M * 2 - (showNum ? 1.1 : 0);
-  if (text) {
-    addBarText(s, text, M, footY + 0.02, textW, FOOT_H - 0.02, 9, hex(t.colors.text), firstFont(t.fonts.body));
+  if (segs.some(Boolean)) {
+    addBarText(s, segs, M, footY + 0.02, textW, FOOT_H - 0.02, 9, hex(t.colors.text), firstFont(t.fonts.body));
   }
   if (showNum) {
     s.addText(`${meta.slideNum} / ${meta.totalSlides}`, {
@@ -1177,7 +1175,7 @@ function addTable(
     (el.align?.[i] as 'left' | 'center' | 'right' | null | undefined) ?? 'left';
 
   const headerRow = el.headers.map((h, i) => ({
-    text: h,
+    text: stripHtml(h),
     options: {
       bold: true,
       color: hex(t.colors.title_text),
@@ -1186,7 +1184,7 @@ function addTable(
     },
   }));
   const bodyRows = el.rows.map((row) =>
-    row.map((cell, i) => ({ text: cell, options: { color: hex(t.colors.text), fontSize: 14, align: colAlign(i) } }))
+    row.map((cell, i) => ({ text: stripHtml(cell), options: { color: hex(t.colors.text), fontSize: 14, align: colAlign(i) } }))
   );
 
   s.addTable([headerRow, ...bodyRows], {
@@ -1248,5 +1246,7 @@ function firstFont(stack: string): string {
 }
 
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]+>/g, '');
+  return html
+    .replace(/<img[^>]+alt="([^"]*)"[^>]*>/gi, '$1')
+    .replace(/<[^>]+>/g, '');
 }

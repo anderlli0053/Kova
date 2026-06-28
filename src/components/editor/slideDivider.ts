@@ -7,12 +7,15 @@ const line = Decoration.line({ class: 'cm-slide-divider' });
 function build(view: EditorView) {
   const { doc } = view.state;
   const b = new RangeSetBuilder<Decoration>();
-  let fm = false; // inside frontmatter
+  let fm = false;    // inside frontmatter
+  let fence = false; // inside ``` or ~~~ code block
   for (let n = 1; n <= doc.lines; n++) {
     const l = doc.line(n);
-    if (l.text.trim() !== '---') continue;
-    if (n === 1) fm = true;        // opening fence
-    else if (fm) fm = false;       // closing fence — not a slide break
+    if (/^(`{3,}|~{3,})/.test(l.text)) { fence = !fence; continue; }
+    if (fence) continue;
+    if (l.text !== '---') continue; // exact match — trailing spaces aren't slide breaks
+    if (n === 1) fm = true;        // opening frontmatter fence
+    else if (fm) fm = false;       // closing frontmatter fence — not a slide break
     else b.add(l.from, l.from, line);
   }
   return b.finish();

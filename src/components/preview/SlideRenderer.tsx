@@ -171,11 +171,13 @@ function mutedSecondary(primaryHex: string): string {
   return hslToHex(h, Math.min(s, 0.35), l < 0.5 ? Math.min(l + 0.20, 0.45) : Math.max(l - 0.20, 0.55));
 }
 
-// Header/footer text. A `|` stretch separator splits it into left | center | right
-// parts (issue #30); without `|` it renders as a single left-aligned span as before.
-function BarText({ text, className }: { text: string; className: string }) {
-  if (!text.includes('|')) return <span className={className}>{text}</span>;
-  const [left = '', center = '', right = ''] = text.split('|').map((s) => s.trim());
+// Header/footer text. A `|` in the *theme template* splits it into left | center | right
+// parts (issue #30). Segments are pre-split from the template before variable resolution
+// so a doc title containing `|` (e.g. "Costs | Benefits") is never treated as a separator.
+function BarText({ segments, className }: { segments: string[]; className: string }) {
+  if (segments.length <= 1) return <span className={className}>{segments[0] ?? ''}</span>;
+  const [left = '', center = '', ...rest] = segments;
+  const right = rest.join(' | ');
   return (
     <span className={`${className} sl-bar-parts`}>
       <span>{left}</span>
@@ -200,7 +202,7 @@ function buildMermaidInit(theme: Theme): string {
   const vars = {
     fontFamily,
     primaryColor:          c.primary,
-    primaryTextColor:      c.title_text,
+    primaryTextColor:      contrastText(c.primary),
     primaryBorderColor:    c.primary,
     lineColor:             c.accent,
     secondaryColor:        secondary,
@@ -269,12 +271,12 @@ export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, total
     if (onAllDiagramsReady && mermaidCount === 0) onAllDiagramsReady();
   }, [onAllDiagramsReady, mermaidCount]);
 
-  const headerText = theme.header.show
-    ? resolveTemplate(theme.header.text, { title: docTitle, date: docDate, slideNumber, totalSlides })
+  const templateVars = { title: docTitle, date: docDate, slideNumber, totalSlides };
+  const headerSegs = theme.header.show
+    ? theme.header.text.split('|').map((s) => resolveTemplate(s.trim(), templateVars))
     : null;
-
-  const footerText = theme.footer.show
-    ? resolveTemplate(theme.footer.text, { title: docTitle, date: docDate, slideNumber, totalSlides })
+  const footerSegs = theme.footer.show
+    ? theme.footer.text.split('|').map((s) => resolveTemplate(s.trim(), templateVars))
     : null;
 
   // Show the floating logo whenever its position doesn't match a visible bar —
@@ -306,7 +308,7 @@ export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, total
                 ...(theme.logo_position === 'top-right' ? { marginLeft: 'auto', order: 2 } : {}),
               }} />
           )}
-          {headerText && <BarText text={headerText} className="sl-header-text" />}
+          {headerSegs?.some(Boolean) && <BarText segments={headerSegs} className="sl-header-text" />}
         </div>
       )}
 
@@ -342,7 +344,7 @@ export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, total
                 ...(theme.logo_position === 'bottom-right' ? { marginLeft: 'auto', order: 2 } : {}),
               }} />
           )}
-          {footerText && <BarText text={footerText} className="sl-footer-text" />}
+          {footerSegs?.some(Boolean) && <BarText segments={footerSegs} className="sl-footer-text" />}
           {theme.footer.show_slide_number && slideNumber !== undefined && (
             <span className="sl-slide-num">{slideNumber}</span>
           )}
@@ -711,11 +713,11 @@ function ElementNode({ el }: { el: SlideElement }) {
       return (
         <table className="sl-table">
           <thead>
-            <tr>{el.headers.map((h, i) => <th key={i} style={{ textAlign: el.align?.[i] || undefined }}>{h}</th>)}</tr>
+            <tr>{el.headers.map((h, i) => <th key={i} style={{ textAlign: el.align?.[i] || undefined }} dangerouslySetInnerHTML={{ __html: h }} />)}</tr>
           </thead>
           <tbody>
             {el.rows.map((row, i) => (
-              <tr key={i}>{row.map((cell, j) => <td key={j} style={{ textAlign: el.align?.[j] || undefined }}>{cell}</td>)}</tr>
+              <tr key={i}>{row.map((cell, j) => <td key={j} style={{ textAlign: el.align?.[j] || undefined }} dangerouslySetInnerHTML={{ __html: cell }} />)}</tr>
             ))}
           </tbody>
         </table>

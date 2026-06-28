@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 type MenuEntry =
   | { type: 'item'; label: string; shortcut?: string; action: () => void; disabled?: boolean }
@@ -20,12 +20,22 @@ const MENU_WIDTH = 205;
 export function EditorContextMenu({ x, y, onClose, entries, onPanelEnter, onPanelLeave }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [openSubmenuIdx, setOpenSubmenuIdx] = useState<number | null>(null);
   const [submenuPos, setSubmenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const isRoot = !onPanelEnter;
 
   const cx = Math.min(x, window.innerWidth - MENU_WIDTH - 8);
   const [cy, setCy] = useState(y);
+
+  // Indices into `entries` that are keyboard-navigable (non-disabled items and submenus).
+  const focusableIndices = useMemo(
+    () => entries.reduce<number[]>((acc, e, i) => {
+      if ((e.type === 'item' && !e.disabled) || e.type === 'submenu') acc.push(i);
+      return acc;
+    }, []),
+    [entries],
+  );
 
   useLayoutEffect(() => {
     if (ref.current) {
@@ -36,10 +46,24 @@ export function EditorContextMenu({ x, y, onClose, entries, onPanelEnter, onPane
 
   useEffect(() => {
     if (!isRoot) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // Auto-focus the first focusable item when the menu opens.
+    if (focusableIndices.length > 0) {
+      itemRefs.current[focusableIndices[0]]?.focus();
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const focused = document.activeElement;
+      const pos = focusableIndices.findIndex((i) => itemRefs.current[i] === focused);
+      const next = e.key === 'ArrowDown'
+        ? (pos + 1) % focusableIndices.length
+        : (pos - 1 + focusableIndices.length) % focusableIndices.length;
+      itemRefs.current[focusableIndices[next]]?.focus();
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose, isRoot]);
+  }, [onClose, isRoot, focusableIndices]);
 
   function openSubmenu(i: number, el: HTMLDivElement) {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
@@ -88,22 +112,24 @@ export function EditorContextMenu({ x, y, onClose, entries, onPanelEnter, onPane
       {isRoot && (
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
-          onMouseDown={onClose}
+          onMouseDown={(e) => { e.preventDefault(); onClose(); }}
         />
       )}
       <div
         ref={ref}
+        role="menu"
+        aria-label="Context menu"
         style={panelStyle}
         onMouseEnter={onPanelEnter}
         onMouseLeave={onPanelLeave}
       >
         {entries.map((entry, i) => {
           if (entry.type === 'divider') {
-            return <div key={i} style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />;
+            return <div key={i} role="separator" style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />;
           }
           if (entry.type === 'header') {
             return (
-              <div key={i} style={{ padding: '5px 14px 2px', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              <div key={i} role="none" style={{ padding: '5px 14px 2px', fontSize: 10, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 {entry.label}
               </div>
             );
@@ -113,6 +139,11 @@ export function EditorContextMenu({ x, y, onClose, entries, onPanelEnter, onPane
             return (
               <div
                 key={i}
+                ref={(el) => { itemRefs.current[i] = el; }}
+                role="menuitem"
+                aria-haspopup="true"
+                aria-expanded={isOpen}
+                tabIndex={-1}
                 style={{ ...rowStyle, cursor: 'pointer', background: isOpen ? 'var(--bg-hover)' : 'transparent' }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-hover)';
@@ -123,6 +154,12 @@ export function EditorContextMenu({ x, y, onClose, entries, onPanelEnter, onPane
                     (e.currentTarget as HTMLDivElement).style.background = 'transparent';
                   scheduleClose();
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    openSubmenu(i, e.currentTarget as HTMLDivElement);
+                  }
+                }}
               >
                 <span>{entry.label}</span>
                 <span style={{ color: 'var(--text-dim)', fontSize: 10, marginLeft: 24 }}>▶</span>
@@ -132,10 +169,20 @@ export function EditorContextMenu({ x, y, onClose, entries, onPanelEnter, onPane
           return (
             <div
               key={i}
+              ref={(el) => { itemRefs.current[i] = el; }}
+              role="menuitem"
+              aria-disabled={entry.disabled}
+              tabIndex={-1}
               style={{ ...rowStyle, cursor: entry.disabled ? 'default' : 'pointer', opacity: entry.disabled ? 0.35 : 1 }}
               onMouseDown={(e) => {
                 e.preventDefault();
                 if (!entry.disabled) { entry.action(); onClose(); }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (!entry.disabled) { entry.action(); onClose(); }
+                }
               }}
               onMouseEnter={(e) => {
                 if (!entry.disabled)
