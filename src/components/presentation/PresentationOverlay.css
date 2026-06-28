@@ -85,6 +85,24 @@
   font-variant-numeric: tabular-nums;
   min-width: 56px;
   text-align: center;
+  cursor: pointer;
+}
+
+.pres-hud__counter:hover {
+  color: #aaa;
+}
+
+.pres-hud__jump-input {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  width: 56px;
+  text-align: center;
+  background: #1a1a1a;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #ddd;
+  padding: 2px 4px;
+  outline: none;
 }
 
 .pres-hud__timer {

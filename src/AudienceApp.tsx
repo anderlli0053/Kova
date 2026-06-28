@@ -24,6 +24,7 @@ export function AudienceApp() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [scale, setScale]               = useState(1);
   const [laser, setLaser]               = useState<{ x: number; y: number; color: string } | null>(null);
+  const [blankMode, setBlankMode]       = useState<'black' | 'white' | null>(null);
   const slidesRef = useRef<Slide[]>([]);
   const frameRef  = useRef<HTMLDivElement>(null);
 
@@ -32,6 +33,7 @@ export function AudienceApp() {
     let unlistenNav:   (() => void) | undefined;
     let unlistenExit:  (() => void) | undefined;
     let unlistenLaser: (() => void) | undefined;
+    let unlistenBlank: (() => void) | undefined;
 
     async function setup() {
       unlistenInit = await listen<PresentInitPayload>('present:init', (e) => {
@@ -53,11 +55,15 @@ export function AudienceApp() {
         setLaser(active ? { x, y, color: color ?? '#ff2020' } : null);
       });
 
+      unlistenBlank = await listen<{ mode: 'black' | 'white' | null }>('present:blank', (e) => {
+        setBlankMode(e.payload.mode);
+      });
+
       await emit('present:ready', null);
     }
 
     setup();
-    return () => { unlistenInit?.(); unlistenNav?.(); unlistenExit?.(); unlistenLaser?.(); };
+    return () => { unlistenInit?.(); unlistenNav?.(); unlistenExit?.(); unlistenLaser?.(); unlistenBlank?.(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,6 +135,9 @@ export function AudienceApp() {
       position: 'fixed', inset: 0, background: '#000',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
+      {blankMode && (
+        <div style={{ position: 'absolute', inset: 0, background: blankMode, zIndex: 10 }} />
+      )}
       {/* Outer box constrains to the slide's aspect ratio */}
       <div style={{
         position: 'relative',

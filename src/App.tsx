@@ -520,13 +520,14 @@ export default function App() {
     isExitingRef.current = false;
   }, [slides, visibleSlides, safePresentIndex]);
 
-  const handlePresentEnter = useCallback(async (e?: React.MouseEvent) => {
+  const handlePresentEnter = useCallback(async (eOrFromCurrent?: React.MouseEvent | boolean) => {
     if (visibleSlides.length === 0) return;
     isExitingRef.current = false;
     const sessionId = ++presentSessionRef.current;
-    // "Present from current" (alt) maps the editor's slide into visible space;
-    // if that slide is hidden, indexOf is -1 → start from the first visible.
-    const startIndex = e?.altKey ? Math.max(0, visibleSlides.indexOf(slides[safeSlideIndex])) : 0;
+    // "Present from current" — accepts a boolean (keyboard path) or a MouseEvent
+    // (alt+click path). If a hidden slide is current, indexOf is -1 → first visible.
+    const fromCurrent = typeof eOrFromCurrent === 'boolean' ? eOrFromCurrent : eOrFromCurrent?.altKey ?? false;
+    const startIndex = fromCurrent ? Math.max(0, visibleSlides.indexOf(slides[safeSlideIndex])) : 0;
     setPresentIndex(startIndex);
 
     // Resolve 'auto': detect monitors first, then pick mode.
@@ -1321,6 +1322,7 @@ export default function App() {
     const sc = (id: string) => getCombo(keybindings.combos, id);
     const handler = (e: KeyboardEvent) => {
       if (presentMode) return;
+      if (e.key === 'F5') { e.preventDefault(); void handlePresentEnter(e.shiftKey); return; }
       if (matchShortcut(e, sc('newFile')))   { e.preventDefault(); handleNewFile(); }
       if (matchShortcut(e, sc('openFile')))  { e.preventDefault(); handleOpenFile(); }
       if (matchShortcut(e, sc('save')))      { e.preventDefault(); if (filePath) handleSave(); else handleSaveAs(); }
@@ -1329,7 +1331,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [presentMode, keybindings.combos, filePath, handleNewFile, handleOpenFile, handleSave, handleSaveAs, toggleFocusMode]);
+  }, [presentMode, keybindings.combos, filePath, handleNewFile, handleOpenFile, handleSave, handleSaveAs, toggleFocusMode, handlePresentEnter]);
 
   // Close menus when the user clicks outside them.
   useEffect(() => {

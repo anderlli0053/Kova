@@ -58,6 +58,8 @@ export function PresenterOverlay({
   const [nextScale, setNextScale]       = useState(1);
   const [showNotes, setShowNotes]       = useState(true);
   const [laserActive, setLaserActive]   = useState(false);
+  const [blankMode, setBlankMode]       = useState<'black' | 'white' | null>(null);
+  const [jumpInput, setJumpInput]       = useState<string | null>(null);
   const [laserPos, setLaserPos]         = useState<{ x: number; y: number } | null>(null);
   const startTime      = useRef(Date.now());
   const overlayRef     = useRef<HTMLDivElement>(null);
@@ -112,6 +114,11 @@ export function PresenterOverlay({
     emitTo('audience', 'present:navigate', { index: currentIndex }).catch(() => {});
   }, [currentIndex]);
 
+  // Sync blank state to audience window.
+  useEffect(() => {
+    emitTo('audience', 'present:blank', { mode: blankMode }).catch(() => {});
+  }, [blankMode]);
+
   const handleCurrentFrameMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!currentFrameRef.current) return;
     const rect = currentFrameRef.current.getBoundingClientRect();
@@ -155,6 +162,7 @@ export function PresenterOverlay({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return;
       switch (e.key) {
         case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown':
           e.preventDefault(); e.stopPropagation(); goNext(); break;
@@ -167,6 +175,12 @@ export function PresenterOverlay({
         case 'n': case 'N':
           e.preventDefault(); e.stopPropagation();
           setShowNotes((p) => !p); break;
+        case 'b': case 'B':
+          e.preventDefault(); e.stopPropagation();
+          setBlankMode((m) => m === 'black' ? null : 'black'); break;
+        case 'w': case 'W':
+          e.preventDefault(); e.stopPropagation();
+          setBlankMode((m) => m === 'white' ? null : 'white'); break;
         case 'l': case 'L':
           e.preventDefault(); e.stopPropagation();
           setLaserActive((p) => !p); break;
@@ -228,6 +242,18 @@ export function PresenterOverlay({
                   boxShadow: `0 0 6px 2px ${laserColor}b3, 0 0 16px 5px ${laserColor}4d`,
                 }}
               />
+            )}
+            {blankMode && (
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 5,
+                background: blankMode === 'black' ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.75)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{
+                  color: blankMode === 'black' ? '#aaa' : '#444',
+                  fontSize: 13, fontWeight: 500,
+                }}>Audience screen is blank</span>
+              </div>
             )}
           </div>
         </div>
@@ -298,7 +324,33 @@ export function PresenterOverlay({
             disabled={currentIndex === 0}
             title="Previous (←)"
           >‹</button>
-          <span className="pres-presenter__counter">{currentIndex + 1} / {total}</span>
+          {jumpInput !== null ? (
+            <input
+              className="pres-presenter__jump-input"
+              type="text"
+              inputMode="numeric"
+              autoFocus
+              onFocus={(e) => e.target.select()}
+              value={jumpInput}
+              onChange={(e) => setJumpInput(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const n = parseInt(jumpInput, 10);
+                  if (!isNaN(n)) onNavigate(Math.min(Math.max(n - 1, 0), total - 1));
+                  setJumpInput(null);
+                } else if (e.key === 'Escape') {
+                  setJumpInput(null);
+                }
+              }}
+              onBlur={() => setJumpInput(null)}
+            />
+          ) : (
+            <span
+              className="pres-presenter__counter"
+              onClick={() => setJumpInput(String(currentIndex + 1))}
+              title="Click to jump to slide"
+            >{currentIndex + 1} / {total}</span>
+          )}
           <button
             className="pres-presenter__btn"
             onClick={goNext}
