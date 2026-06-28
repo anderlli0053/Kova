@@ -1233,6 +1233,11 @@ export default function App() {
     }
   }, [settings.uiTheme]);
 
+  // Apply UI scale via the --ui-scale var (drives `html { zoom }` in global.css)
+  useEffect(() => {
+    document.documentElement.style.setProperty('--ui-scale', String(settings.uiScale));
+  }, [settings.uiScale]);
+
   // handleSave gets a new identity on every keystroke (it depends on `content`
   // via buildSaveContent). A ref lets the autosave timer below call the latest
   // save logic without including that ever-changing identity in its own

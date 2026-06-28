@@ -93,6 +93,12 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+/* UI scale (Settings → Appearance). zoom on html remaps vw/vh to the scaled
+   layout viewport, so .app's 100vw/100vh fills the window at any scale.
+   Presentation overlays counter-zoom so slides stay pixel-exact. */
+html { zoom: var(--ui-scale, 1); }
+.pres-overlay, .pres-presenter { zoom: calc(1 / var(--ui-scale, 1)); }
+
 .app {
   display: flex;
   flex-direction: column;

@@ -30,6 +30,7 @@ export const EDITOR_FONT_OPTIONS: { value: EditorFont; label: string; family: st
 export interface AppSettings {
   settingsVersion: number;
   uiTheme: UiTheme;
+  uiScale: number;
   editorFont: EditorFont;
   autosave: boolean;
   autosaveIntervalSeconds: number; // 15 | 30 | 60 | 300
@@ -59,6 +60,7 @@ function buildDefaults(): AppSettings {
   return {
     settingsVersion: 1,
     uiTheme: 'auto',
+    uiScale: 1,
     editorFont: 'ibm-plex-mono',
     autosave: true,
     autosaveIntervalSeconds: 30,

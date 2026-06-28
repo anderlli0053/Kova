@@ -311,6 +311,36 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         <div style={{ padding: '10px 0' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>Interface scale</div>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={Math.round(settings.uiScale * 100)}
+              onChange={(e) => set('uiScale', Number(e.target.value) / 100)}
+              style={{
+                width: '100%',
+                padding: '6px 28px 6px 10px',
+                fontSize: 12,
+                borderRadius: 4,
+                border: '1px solid var(--border-alt)',
+                background: 'var(--bg-input)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                outline: 'none',
+              }}
+            >
+              {[70, 80, 90, 100, 110, 120, 130, 140, 150].map(pct => (
+                <option key={pct} value={pct}>{pct}%</option>
+              ))}
+            </select>
+            <svg viewBox="0 0 10 6" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 10, height: 6, pointerEvents: 'none', color: 'var(--text-dim)' }}>
+              <path d="M0 0l5 6 5-6z" fill="currentColor" />
+            </svg>
+          </div>
+        </div>
+
+        <div style={{ padding: '10px 0' }}>
           <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>Editor font</div>
           <div style={{ position: 'relative' }}>
             <select
