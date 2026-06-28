@@ -187,6 +187,58 @@ describe('element parsing', () => {
     expect(table?.type === 'table' && table.align).toEqual(['left', 'center', 'right']);
   });
 
+  it('renders bold inline markdown in table cells', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      '| Label | Value |',
+      '|-------|-------|',
+      '| **Revenue** | $1M |',
+    ].join('\n')));
+    const table = slides[0].elements.find((e) => e.type === 'table');
+    expect(table?.type === 'table' && table.headers).toEqual(['Label', 'Value']);
+    expect(table?.type === 'table' && table.rows[0][0]).toContain('<strong>Revenue</strong>');
+    expect(table?.type === 'table' && table.rows[0][1]).toBe('$1M');
+  });
+
+  it('renders italic and link inline markdown in table cells', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      '| Text | Link |',
+      '|------|------|',
+      '| *emphasis* | [docs](https://example.com) |',
+    ].join('\n')));
+    const table = slides[0].elements.find((e) => e.type === 'table');
+    expect(table?.type === 'table' && table.rows[0][0]).toContain('<em>emphasis</em>');
+    expect(table?.type === 'table' && table.rows[0][1]).toContain('<a href="https://example.com">docs</a>');
+  });
+
+  it('leaves plain table cell text unchanged', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      '| A | B |',
+      '|---|---|',
+      '| plain | text |',
+    ].join('\n')));
+    const table = slides[0].elements.find((e) => e.type === 'table');
+    expect(table?.type === 'table' && table.rows[0]).toEqual(['plain', 'text']);
+  });
+
+  it('renders inline formatting in table header cells', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      '| **Metric** | Count |',
+      '|------------|-------|',
+      '| Users | 42 |',
+    ].join('\n')));
+    const table = slides[0].elements.find((e) => e.type === 'table');
+    expect(table?.type === 'table' && table.headers[0]).toContain('<strong>Metric</strong>');
+    expect(table?.type === 'table' && table.headers[1]).toBe('Count');
+  });
+
   it('discards whitespace-only paragraphs', () => {
     const { slides } = parseDocument(doc('## Slide\n\n   \n\n- Item\n'));
     const paras = slides[0].elements.filter((e) => e.type === 'paragraph');
