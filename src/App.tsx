@@ -711,7 +711,10 @@ export default function App() {
     const unlisten = listen<{ key: string }>('audience:key', (e) => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: e.payload.key, bubbles: true, cancelable: true }));
     });
-    return () => { unlisten.then((fn) => fn()); };
+    const unlistenWheel = listen<{ deltaY: number }>('audience:wheel', (e) => {
+      window.dispatchEvent(new WheelEvent('wheel', { deltaY: e.payload.deltaY, bubbles: true, cancelable: true }));
+    });
+    return () => { unlisten.then((fn) => fn()); unlistenWheel.then((fn) => fn()); };
   }, [presentMode, presenterMode]);
 
   // Mirror mode: keep the audience window in sync with the presenter's slide.

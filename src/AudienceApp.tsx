@@ -104,6 +104,17 @@ export function AudienceApp() {
     return () => window.removeEventListener('keydown', handler);
   }, [initData]);
 
+  // Forward scroll wheel events so the presenter can advance slides by
+  // scrolling on the audience display.
+  useEffect(() => {
+    if (!initData) return;
+    const handler = (e: WheelEvent) => {
+      emitTo('main', 'audience:wheel', { deltaY: e.deltaY }).catch(() => {});
+    };
+    window.addEventListener('wheel', handler, { passive: true });
+    return () => window.removeEventListener('wheel', handler);
+  }, [initData]);
+
   // Attach ResizeObserver once the frame div is in the DOM (after initData arrives).
   useEffect(() => {
     if (!frameRef.current) return;

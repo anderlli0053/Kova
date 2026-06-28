@@ -49,6 +49,7 @@ export function PresentationOverlay({
   const [elapsed, setElapsed] = useState(0);
   const startTime = useRef(Date.now());
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastWheelTime = useRef(0);
   const overlayRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
 
@@ -132,6 +133,21 @@ export function PresentationOverlay({
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
   }, [goNext, goPrev, onNavigate, total, onExit, slide, resetIdle]);
+
+  // ── Scroll wheel handler ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastWheelTime.current < 300) return;
+      lastWheelTime.current = now;
+      resetIdle();
+      if (e.deltaY > 0) goNext(); else goPrev();
+    };
+    window.addEventListener('wheel', handler, { passive: false });
+    return () => window.removeEventListener('wheel', handler);
+  }, [goNext, goPrev, resetIdle]);
 
   // Clear laser position when deactivated
   useEffect(() => { if (!laserActive) setLaserPos(null); }, [laserActive]);
