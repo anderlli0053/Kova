@@ -16,4 +16,22 @@ describe('normalizePath', () => {
   it('keeps the Windows drive letter and uses backslashes', () => {
     expect(normalizePath('C:\\docs\\talks', '..\\img\\x.png')).toBe('C:\\docs\\img\\x.png');
   });
+
+  it('normalizes Windows paths with mixed forward and backslash separators', () => {
+    expect(normalizePath('C:\\docs\\talks', '../img/x.png')).toBe('C:\\docs\\img\\x.png');
+    expect(normalizePath('C:/docs/talks', '..\\img\\x.png')).toBe('C:/docs/img/x.png');
+    expect(normalizePath('C:\\docs/talks', 'sub/y.png')).toBe('C:\\docs\\talks\\sub\\y.png');
+  });
+
+  it("doesn't climb above the Windows drive root", () => {
+    expect(normalizePath('C:\\docs', '..\\..\\..\\x.png')).toBe('C:\\x.png');
+    expect(normalizePath('C:\\', '..\\x.png')).toBe('C:\\x.png');
+  });
+
+  it('collapses empty and absolute path segments', () => {
+    expect(normalizePath('/docs/talks', '/img/x.png')).toBe('/docs/talks/img/x.png');
+    expect(normalizePath('/docs/talks', '')).toBe('/docs/talks');
+    expect(normalizePath('/docs//talks', 'sub//y.png')).toBe('/docs/talks/sub/y.png');
+    expect(normalizePath('C:\\docs\\\\talks', 'sub//y.png')).toBe('C:\\docs\\talks\\sub\\y.png');
+  });
 });
