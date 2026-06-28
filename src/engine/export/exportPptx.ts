@@ -700,6 +700,25 @@ function addReferences(s: PS, refs: string[], t: Theme, H: number, hasFoot: bool
 
 // ── Header / Footer bars ──────────────────────────────────────────────────────
 
+// Mirrors the BarText component and .sl-bar-parts CSS (issue #30/#44):
+// a `|` separator splits text into left | center | right equal-width segments.
+function addBarText(
+  s: PS,
+  text: string,
+  x: number, y: number, w: number, h: number,
+  fontSize: number, color: string, fontFace: string,
+) {
+  if (!text.includes('|')) {
+    s.addText(text, { x, y, w, h, fontSize, color, fontFace, align: 'left', valign: 'middle' });
+    return;
+  }
+  const [left = '', center = '', right = ''] = text.split('|').map((p) => p.trim());
+  const colW = w / 3;
+  if (left)   s.addText(left,   { x,            y, w: colW, h, fontSize, color, fontFace, align: 'left',   valign: 'middle' });
+  if (center) s.addText(center, { x: x + colW,  y, w: colW, h, fontSize, color, fontFace, align: 'center', valign: 'middle' });
+  if (right)  s.addText(right,  { x: x + colW * 2, y, w: colW, h, fontSize, color, fontFace, align: 'right',  valign: 'middle' });
+}
+
 function addHeaderBar(s: PS, t: Theme, meta: Meta) {
   s.addShape('rect', {
     x: 0, y: 0, w: W, h: HEAD_H,
@@ -711,12 +730,7 @@ function addHeaderBar(s: PS, t: Theme, meta: Meta) {
     slideNumber: meta.slideNum, totalSlides: meta.totalSlides,
   });
   if (text) {
-    s.addText(text, {
-      x: M, y: 0, w: W - M * 2, h: HEAD_H,
-      fontSize: 10, color: hex(t.colors.title_text),
-      fontFace: firstFont(t.fonts.body),
-      align: 'left', valign: 'middle',
-    });
+    addBarText(s, text, M, 0, W - M * 2, HEAD_H, 10, hex(t.colors.title_text), firstFont(t.fonts.body));
   }
 }
 
@@ -734,13 +748,9 @@ function addFooterBar(s: PS, t: Theme, meta: Meta, H: number) {
     title: meta.docTitle, date: meta.docDate,
     slideNumber: meta.slideNum, totalSlides: meta.totalSlides,
   });
+  const textW = W - M * 2 - (showNum ? 1.1 : 0);
   if (text) {
-    s.addText(text, {
-      x: M, y: footY + 0.02, w: W - M * 2 - (showNum ? 1.1 : 0), h: FOOT_H - 0.02,
-      fontSize: 9, color: hex(t.colors.text),
-      fontFace: firstFont(t.fonts.body),
-      align: 'left', valign: 'middle',
-    });
+    addBarText(s, text, M, footY + 0.02, textW, FOOT_H - 0.02, 9, hex(t.colors.text), firstFont(t.fonts.body));
   }
   if (showNum) {
     s.addText(`${meta.slideNum} / ${meta.totalSlides}`, {
