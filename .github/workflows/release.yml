@@ -8,7 +8,62 @@ on:
   workflow_dispatch:
 
 jobs:
+
+  # Creates the draft release before any platform build starts.  Without this,
+  # all three platform jobs race to create the release simultaneously and the
+  # losers' assets are silently dropped.
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create draft release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Skip if a release already exists (re-run or workflow_dispatch reuse).
+          gh release view "${{ github.ref_name }}" -R "${{ github.repository }}" \
+            --json id 2>/dev/null && exit 0
+
+          cat > /tmp/release-notes.md << 'NOTES'
+          ## What's new
+
+          ### New features
+          - **Markdown tables** — full GFM table support with inline formatting inside cells (requested by @SFZUlm, #48).
+          - **Presenter: slide jump, blank screen, F5 shortcuts** — type a slide number to jump directly; press `B` to blank the screen; `F5` / `Shift+F5` start and exit presentation.
+          - **Presenter: Home / End navigation** — jump to the first or last slide instantly (by @vadika, #47).
+          - **Keyboard slide navigation in editor** — `Alt+↑` / `Alt+↓` move between slides without touching the mouse (by @vadika, #42).
+          - **Slide divider line** — a subtle visual separator between slides in the editor (by @vadika, #41).
+
+          ### Bug fixes
+          - **Fixed panels hidden after relaunch when closed in focus mode** — the collapsed panel sizes were being saved and then restored on next launch, leaving the slide preview and inspector invisible until manually resized.
+          - **Fixed duplicate Windows desktop shortcuts on upgrade** — a legacy per-machine shortcut was created on top of the existing one on each install (reported by @a1880, #39).
+          - **Fixed edge-to-edge icon artwork** — icon rendering was clipped on Windows, Linux, and mobile platforms.
+          - **Fixed `|` segmented header/footer not exporting to PPTX** — the split was applied after variable resolution, so a document title containing `|` (e.g. "Costs | Benefits") was treated as a separator (reported by @a1880, #44).
+          - **Fixed white-on-white Mermaid labels** — `labelTextColor` now follows the slide body text colour.
+
+          ---
+
+          ## Installation
+
+          | Platform | Download | Note |
+          |---|---|---|
+          | **macOS** (Apple Silicon + Intel) | `.dmg` | Signed and notarised — double-click to install |
+          | **Windows 10/11** | `.msi` or `_x64-setup.exe` | Click **More info → Run anyway** if SmartScreen appears (app is unsigned) |
+          | **Linux** | `.deb` (Debian/Ubuntu) or `.rpm` (Fedora/RHEL/openSUSE) | Install via your package manager |
+          | **Linux AppImage** | `.AppImage` | Graphics libs stripped for compatibility with Arch/Fedora/etc. **No auto-update** — re-download manually for future releases. |
+
+          > **Beta release** — expect rough edges. Please report bugs via [Issues](../../issues).
+          NOTES
+
+          gh release create "${{ github.ref_name }}" \
+            -R "${{ github.repository }}" \
+            --draft \
+            --title "Kova ${{ github.ref_name }}" \
+            --notes-file /tmp/release-notes.md
+
   release:
+    needs: [create-release]
     permissions:
       contents: write   # needed to create the GitHub release and upload assets
 
@@ -101,35 +156,6 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Kova ${{ github.ref_name }}'
-          releaseBody: |
-            ## What's new
-
-            ### New features
-            - **Markdown tables** — full GFM table support with inline formatting inside cells (requested by @SFZUlm, #48).
-            - **Presenter: slide jump, blank screen, F5 shortcuts** — type a slide number to jump directly; press `B` to blank the screen; `F5` / `Shift+F5` start and exit presentation.
-            - **Presenter: Home / End navigation** — jump to the first or last slide instantly (by @vadika, #47).
-            - **Keyboard slide navigation in editor** — `Alt+↑` / `Alt+↓` move between slides without touching the mouse (by @vadika, #42).
-            - **Slide divider line** — a subtle visual separator between slides in the editor (by @vadika, #41).
-
-            ### Bug fixes
-            - **Fixed panels hidden after relaunch when closed in focus mode** — the collapsed panel sizes were being saved and then restored on next launch, leaving the slide preview and inspector invisible until manually resized.
-            - **Fixed duplicate Windows desktop shortcuts on upgrade** — a legacy per-machine shortcut was created on top of the existing one on each install (reported by @a1880, #39).
-            - **Fixed edge-to-edge icon artwork** — icon rendering was clipped on Windows, Linux, and mobile platforms.
-            - **Fixed `|` segmented header/footer not exporting to PPTX** — the split was applied after variable resolution, so a document title containing `|` (e.g. "Costs | Benefits") was treated as a separator (reported by @a1880, #44).
-            - **Fixed white-on-white Mermaid labels** — `labelTextColor` now follows the slide body text colour.
-
-            ---
-
-            ## Installation
-
-            | Platform | Download | Note |
-            |---|---|---|
-            | **macOS** (Apple Silicon + Intel) | `.dmg` | Signed and notarised — double-click to install |
-            | **Windows 10/11** | `.msi` or `_x64-setup.exe` | Click **More info → Run anyway** if SmartScreen appears (app is unsigned) |
-            | **Linux** | `.deb` (Debian/Ubuntu) or `.rpm` (Fedora/RHEL/openSUSE) | Install via your package manager |
-            | **Linux AppImage** | `.AppImage` | Graphics libs stripped for compatibility with Arch/Fedora/etc. **No auto-update** — re-download manually for future releases. |
-
-            > **Beta release** — expect rough edges. Please report bugs via [Issues](../../issues).
           releaseDraft: true    # appears as a draft; publish manually after reviewing the assets
           prerelease: false
           args: ${{ matrix.args }}
