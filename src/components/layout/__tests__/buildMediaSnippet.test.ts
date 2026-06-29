@@ -20,4 +20,9 @@ describe('buildMediaSnippet', () => {
   it('url-encodes spaces in the path', async () => {
     expect(await buildMediaSnippet('/docs/my clip.mov', '/docs/talk.md', warn)).toBe('!video[my clip](my%20clip.mov)');
   });
+
+  it('treats .ogv as video but not .ogg', async () => {
+    expect(await buildMediaSnippet('/docs/video.ogv', '/docs/talk.md', warn)).toBe('!video[video](video.ogv)');
+    expect(await buildMediaSnippet('/docs/audio.ogg', '/docs/talk.md', warn)).toBe('![audio](audio.ogg)');
+  });
 });

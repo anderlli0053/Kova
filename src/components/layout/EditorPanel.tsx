@@ -58,12 +58,9 @@ function encodeMarkdownPath(p: string): string {
 }
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp|bmp|ico|avif|tiff?)$/i;
-const VIDEO_EXT = /\.(mp4|webm|ogg|ogv|mov|m4v|mkv)$/i;
+const VIDEO_EXT = /\.(mp4|webm|ogv|mov|m4v|mkv)$/i;
 const MEDIA_EXT = new RegExp(`${IMAGE_EXT.source}|${VIDEO_EXT.source}`, 'i');
 
-// Copy a dropped/picked media file into the document's assets/ (or reference it
-// relatively if already inside the doc folder) and return its markdown snippet —
-// `!video[..]` for video, `![..]` for images. null on copy failure.
 export async function buildMediaSnippet(abs: string, docPath: string, warn: (m: string) => void): Promise<string | null> {
   const label  = abs.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') ?? 'media';
   const docDir = docPath.substring(0, Math.max(docPath.lastIndexOf('/'), docPath.lastIndexOf('\\')));
@@ -846,13 +843,13 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             Math.max(docPath.lastIndexOf('/'), docPath.lastIndexOf('\\'))
           );
           const arrayBuffer = await blob.arrayBuffer();
-          const pasteExt = blob.type.split('/')[1]?.replace('jpeg', 'jpg') ?? (isVideo ? 'mp4' : 'png');
-          const imageBase64 = btoa(
+          const pasteExt = blob.type.split('/')[1]?.replace('jpeg', 'jpg').replace('quicktime', 'mov') ?? (isVideo ? 'mp4' : 'png');
+          const mediaBase64 = btoa(
             Array.from(new Uint8Array(arrayBuffer)).map((b) => String.fromCharCode(b)).join('')
           );
           try {
             const savedFilename = await invoke<string>('write_asset_bytes', {
-              data: imageBase64,
+              data: mediaBase64,
               filename: `paste-${Date.now()}.${pasteExt}`,
               destDir: docDir,
             });
@@ -882,43 +879,45 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
       e.preventDefault();
 
       void (async () => {
-        let imageBase64: string | null = null;
+        let mediaBase64: string | null = null;
         let pasteExt = 'png';
+        let isVideo = false;
 
         // GTK native clipboard (Linux — WebKitGTK doesn't expose binary
         // image data through e.clipboardData, so we read it natively).
         try {
-          imageBase64 = await invoke<string>('read_clipboard_image');
+          mediaBase64 = await invoke<string>('read_clipboard_image');
           // The Rust command always encodes as PNG.
         } catch {
           // Not Linux, or clipboard has no image.
         }
 
         // Web Clipboard API (Windows WebView2).
-        if (imageBase64 === null) {
+        if (mediaBase64 === null) {
           try {
             const clipboardItems = await navigator.clipboard.read();
             for (const item of clipboardItems) {
-              const imageType = item.types.find((t) => t.startsWith('image/'));
-              if (imageType) {
-                const blob = await item.getType(imageType);
+              const mediaType = item.types.find((t) => t.startsWith('image/') || t.startsWith('video/'));
+              if (mediaType) {
+                isVideo = mediaType.startsWith('video/');
+                const blob = await item.getType(mediaType);
                 const arrayBuffer = await blob.arrayBuffer();
-                imageBase64 = btoa(
+                mediaBase64 = btoa(
                   Array.from(new Uint8Array(arrayBuffer)).map((b) => String.fromCharCode(b)).join('')
                 );
-                pasteExt = imageType.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+                pasteExt = mediaType.split('/')[1]?.replace('jpeg', 'jpg').replace('quicktime', 'mov') ?? (isVideo ? 'mp4' : 'png');
                 break;
               }
             }
           } catch {
-            // API not available or clipboard contains no image.
+            // API not available or clipboard contains no media.
           }
         }
 
-        if (imageBase64 !== null) {
+        if (mediaBase64 !== null) {
           const docPath = filePathRef.current ?? null;
           if (!docPath) {
-            onWarnRef.current?.('Save your document first before pasting images.');
+            onWarnRef.current?.('Save your document first before pasting media.');
             return;
           }
           const docDir = docPath.substring(
@@ -927,11 +926,12 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
           );
           try {
             const savedFilename = await invoke<string>('write_asset_bytes', {
-              data: imageBase64,
+              data: mediaBase64,
               filename: `paste-${Date.now()}.${pasteExt}`,
               destDir: docDir,
             });
-            const snippet = `![](assets/${encodeMarkdownPath(savedFilename)})`;
+            const enc = encodeMarkdownPath(savedFilename);
+            const snippet = isVideo ? `!video[](assets/${enc})` : `![](assets/${enc})`;
             const view = viewRef.current;
             if (!view) return;
             const { from, to } = view.state.selection.main;
@@ -941,8 +941,8 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             });
             view.focus();
           } catch (err) {
-            console.error('[Kova] paste image failed:', err);
-            onWarnRef.current?.('Could not paste image.');
+            console.error('[Kova] paste media failed:', err);
+            onWarnRef.current?.('Could not paste media.');
           }
           return;
         }
@@ -1231,7 +1231,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
 
               const selected = await openFileDialog({
                 multiple: false,
-                filters: [{ name: 'Media', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'avif', 'tiff', 'mp4', 'webm', 'ogg', 'ogv', 'mov', 'm4v', 'mkv'] }],
+                filters: [{ name: 'Media', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'avif', 'tiff', 'mp4', 'webm', 'ogv', 'mov', 'm4v', 'mkv'] }],
               });
               if (!selected) return;
 
