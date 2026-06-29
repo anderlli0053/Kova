@@ -134,4 +134,65 @@ describe('pptxToMarkdown', () => {
     }));
     expect(md).toContain('<!-- slide 1 -->');
   });
+
+  it('prefers ctrTitle (#) over a title block on the same slide', () => {
+    const md = pptxToMarkdown(makeResult({
+      slides: [{
+        blocks: [
+          { kind: 'title', text: 'SubTitle', normX: 0, normY: 0.1, normW: 1, normH: 0.1 },
+          { kind: 'ctrTitle', text: 'Hero', normX: 0, normY: 0, normW: 1, normH: 0.2 },
+        ],
+        speakerNotes: '',
+      }],
+    }));
+    expect(md).toContain('# Hero');
+    expect(md).not.toContain('## SubTitle');
+    expect(md).not.toContain('SubTitle');
+  });
+
+  it('pads table rows that have fewer cells than headers', () => {
+    const md = pptxToMarkdown(makeResult({
+      slides: [{
+        blocks: [{
+          kind: 'table',
+          headers: ['A', 'B', 'C'],
+          rows: [['1']],
+          normX: 0,
+          normY: 0.3,
+          normW: 1,
+          normH: 0.4,
+        }],
+        speakerNotes: '',
+      }],
+    }));
+    expect(md).toContain('| A | B | C |');
+    expect(md).toContain('| 1 |  |  |');
+  });
+
+  it('emits valid markdown for a slide with only a ctrTitle', () => {
+    const md = pptxToMarkdown(makeResult({
+      slides: [{
+        blocks: [{ kind: 'ctrTitle', text: 'Standalone Hero', normX: 0, normY: 0, normW: 1, normH: 0.2 }],
+        speakerNotes: '',
+      }],
+    }));
+    expect(md).toContain('# Standalone Hero');
+    expect(md).not.toContain('<!-- slide 1 -->');
+  });
+
+  it('attaches speaker notes to the correct slide in a multi-slide deck', () => {
+    const md = pptxToMarkdown(makeResult({
+      slides: [
+        { blocks: [{ kind: 'title', text: 'One', normX: 0, normY: 0, normW: 1, normH: 0.2 }], speakerNotes: 'Notes for one' },
+        { blocks: [{ kind: 'title', text: 'Two', normX: 0, normY: 0, normW: 1, normH: 0.2 }], speakerNotes: 'Notes for two' },
+      ],
+    }));
+    const [first, second] = md.split('\n\n---\n\n');
+    expect(first).toContain('## One');
+    expect(first).toContain('Notes for one');
+    expect(first).not.toContain('Notes for two');
+    expect(second).toContain('## Two');
+    expect(second).toContain('Notes for two');
+    expect(second).not.toContain('Notes for one');
+  });
 });
