@@ -47,6 +47,27 @@ describe('extractWords', () => {
     expect(words(doc)).toEqual(['Intro', 'text', 'After', 'code']);
   });
 
+  it('skips words inside tilde-fenced code blocks', () => {
+    const doc = [
+      'Intro text',
+      '~~~',
+      'const hello = 1',
+      '~~~',
+      'After code',
+    ].join('\n');
+    expect(words(doc)).toEqual(['Intro', 'text', 'After', 'code']);
+  });
+
+  it('extracts accented Unicode letters', () => {
+    expect(words('café über naïve résumé')).toEqual(['café', 'über', 'naïve', 'résumé']);
+  });
+
+  it('treats a standalone ??? marker as containing no words', () => {
+    // extractWords does not strip speaker notes — only the ??? marker itself
+    // yields no words (it has no letters); surrounding prose is still extracted.
+    expect(words('Body text\n\n???\n\nPresenter notes')).toEqual(['Body', 'text', 'Presenter', 'notes']);
+  });
+
   it('skips inline code spans', () => {
     expect(words('Use `helloWorld` here')).toEqual(['Use', 'here']);
   });
