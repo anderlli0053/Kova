@@ -84,4 +84,52 @@ describe('patchFrontmatter', () => {
     expect(out).toContain('# One');
     expect(out).toContain('# Two');
   });
+
+  it('patches a key when the body starts immediately after the closing ---', () => {
+    const input = '---\ntitle: Old\n---\n# Slide\n';
+    const out = patchFrontmatter(input, { title: 'New' });
+    expect(out).toMatch(/title: "?New"?/);
+    expect(out).toContain('---\n');
+    expect(out.endsWith('# Slide\n')).toBe(true);
+    expect(out).not.toContain('\n\n# Slide');
+  });
+
+  it('preserves sibling keys inside theme_overrides when the patch carries the merged map', () => {
+    const input = [
+      '---',
+      'theme_overrides:',
+      '  footer:',
+      '    text: "Old"',
+      '    show_slide_number: true',
+      '  colors:',
+      '    primary: "#111"',
+      '---',
+      '# Slide',
+    ].join('\n');
+    const out = patchFrontmatter(input, {
+      theme_overrides: {
+        footer: { text: 'New', show_slide_number: true },
+        colors: { primary: '#111' },
+      },
+    });
+    expect(out).toMatch(/text: "?New"?/);
+    expect(out).toMatch(/primary: "?#111"?/);
+    expect(out).toContain('# Slide');
+  });
+
+  it('preserves CRLF line endings in the body on patch', () => {
+    const input = '---\r\ntitle: Old\r\n---\r\n# Slide\r\n';
+    const out = patchFrontmatter(input, { title: 'New' });
+    expect(out).toMatch(/title: "?New"?/);
+    expect(out.endsWith('# Slide\r\n')).toBe(true);
+  });
+
+  it('creates frontmatter with multiple keys when none existed', () => {
+    const out = patchFrontmatter('# Slide\n', { title: 'Deck', author: 'Ada', date: 2024 });
+    expect(out.startsWith('---\n')).toBe(true);
+    expect(out).toMatch(/title: "?Deck"?/);
+    expect(out).toMatch(/author: "?Ada"?/);
+    expect(out).toMatch(/date: 2024/);
+    expect(out.endsWith('# Slide\n')).toBe(true);
+  });
 });
