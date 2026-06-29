@@ -315,6 +315,31 @@ describe('inline HTML generation', () => {
     const para = slides[0].elements.find((e) => e.type === 'paragraph');
     expect(para?.type === 'paragraph' && para.html).toContain('<br>');
   });
+
+  it('converts strikethrough to <del>', () => {
+    const { slides } = parseDocument(doc('## Slide\n\nThis is ~~struck~~ text.\n'));
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(para?.type === 'paragraph' && para.html).toContain('<del>struck</del>');
+  });
+
+  it('converts inline code to <code>', () => {
+    const { slides } = parseDocument(doc('## Slide\n\nUse `npm test` to run.\n'));
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(para?.type === 'paragraph' && para.html).toContain('<code>npm test</code>');
+  });
+
+  it('escapes HTML entities inside inline code', () => {
+    const { slides } = parseDocument(doc('## Slide\n\nCompare `a < b && c > d`.\n'));
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(para?.type === 'paragraph' && para.html).toContain('<code>a &lt; b &amp;&amp; c &gt; d</code>');
+  });
+
+  it('combines bold and strikethrough in one paragraph', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n**bold** and ~~del~~ together.\n'));
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(para?.type === 'paragraph' && para.html).toContain('<strong>bold</strong>');
+    expect(para?.type === 'paragraph' && para.html).toContain('<del>del</del>');
+  });
 });
 
 // ── Math (KaTeX / remark-math) ────────────────────────────────────────────────
