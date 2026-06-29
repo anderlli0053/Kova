@@ -190,3 +190,50 @@ describe('parser → layout integration', () => {
     expect(slides[0].speakerNotes).toContain('Presenter notes only');
   });
 });
+
+describe('parser → layout integration (multi-slide deck)', () => {
+  it('assigns the correct layout to each slide of a realistic deck', () => {
+    const md = [
+      '---',
+      'title: Realistic Deck',
+      '---',
+      '',
+      '# Title slide',
+      '',
+      '---',
+      '',
+      '## Section',
+      '',
+      '---',
+      '',
+      '## Content',
+      '',
+      'Some body text',
+      '',
+      '---',
+      '',
+      '## Code',
+      '',
+      '```js',
+      'const x = 1',
+      '```',
+      '',
+      '---',
+      '',
+      '![](img.png)',
+    ].join('\n');
+    const { slides } = parseDocument(md);
+    expect(slides).toHaveLength(5);
+    expect(slides.map((s) => s.layout)).toEqual([
+      'title',
+      'section',
+      'title-content',
+      'code',
+      'full-bleed',
+    ]);
+    expect(slides[0].title).toBe('Title slide');
+    expect(slides[1].title).toBe('Section');
+    expect(slides[4].title).toBe('');
+    expect(slides[4].elements.find((e) => e.type === 'image')).toBeTruthy();
+  });
+});
