@@ -502,19 +502,21 @@ export function sanitiseThemeOverrides(raw: Record<string, unknown>): Partial<Th
     result.logo_opacity = Math.min(1, Math.max(0, raw.logo_opacity));
   }
 
-  // Header/footer: validate individual fields rather than blindly passing through.
+  // Header/footer text skips the colors/fonts CSS-injection guard: it renders as
+  // React-escaped text, and `{title}`/`{date}` braces are its template syntax — the
+  // `[;{}]` check would wrongly drop every templated footer (issue #55).
   if (raw.header && typeof raw.header === 'object') {
     const h = raw.header as Record<string, unknown>;
     const header: Record<string, unknown> = {};
     if (typeof h.show === 'boolean') header.show = h.show;
-    if (typeof h.text === 'string' && !/[;{}]/.test(h.text)) header.text = h.text;
+    if (typeof h.text === 'string') header.text = h.text;
     if (Object.keys(header).length > 0) result.header = header as unknown as ThemeHeader;
   }
   if (raw.footer && typeof raw.footer === 'object') {
     const f = raw.footer as Record<string, unknown>;
     const footer: Record<string, unknown> = {};
     if (typeof f.show === 'boolean') footer.show = f.show;
-    if (typeof f.text === 'string' && !/[;{}]/.test(f.text)) footer.text = f.text;
+    if (typeof f.text === 'string') footer.text = f.text;
     if (typeof f.show_slide_number === 'boolean') footer.show_slide_number = f.show_slide_number;
     if (Object.keys(footer).length > 0) result.footer = footer as unknown as ThemeFooter;
   }

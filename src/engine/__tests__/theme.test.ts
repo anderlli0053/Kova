@@ -166,16 +166,17 @@ describe('sanitiseThemeOverrides', () => {
     expect(result.footer?.show).toBe(true);
     expect(result.footer?.text).toBe('Confidential');
     expect(result.footer?.show_slide_number).toBe(true);
-    expect(result.header?.text).toBeUndefined();
+    // Text renders as escaped content, not CSS — `;` is allowed.
+    expect(result.header?.text).toBe('bad; css');
   });
 
-  it('drops footer/header text containing template braces (CSS-injection guard)', () => {
+  it('keeps footer/header text containing template braces (issue #55)', () => {
     const result = sanitiseThemeOverrides({
-      footer: { text: 'Page {title}' },
+      footer: { text: '{date} | {title} | {slide_number} / {total}' },
       header: { text: '{title}' },
     });
-    expect(result.footer?.text).toBeUndefined();
-    expect(result.header?.text).toBeUndefined();
+    expect(result.footer?.text).toBe('{date} | {title} | {slide_number} / {total}');
+    expect(result.header?.text).toBe('{title}');
   });
 
   it('clamps logo_opacity and accepts valid logo paths', () => {
