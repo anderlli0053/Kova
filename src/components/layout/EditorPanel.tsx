@@ -57,6 +57,35 @@ function encodeMarkdownPath(p: string): string {
   return p.replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
 
+const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp|bmp|ico|avif|tiff?)$/i;
+const VIDEO_EXT = /\.(mp4|webm|ogg|ogv|mov|m4v|mkv)$/i;
+const MEDIA_EXT = new RegExp(`${IMAGE_EXT.source}|${VIDEO_EXT.source}`, 'i');
+
+// Copy a dropped/picked media file into the document's assets/ (or reference it
+// relatively if already inside the doc folder) and return its markdown snippet —
+// `!video[..]` for video, `![..]` for images. null on copy failure.
+export async function buildMediaSnippet(abs: string, docPath: string, warn: (m: string) => void): Promise<string | null> {
+  const label  = abs.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') ?? 'media';
+  const docDir = docPath.substring(0, Math.max(docPath.lastIndexOf('/'), docPath.lastIndexOf('\\')));
+  const normAbs = abs.replace(/\\/g, '/');
+  const normDir = docDir.replace(/\\/g, '/');
+
+  let rel: string;
+  if (normAbs.startsWith(normDir + '/')) {
+    rel = makeRelativePath(docPath, abs);
+  } else {
+    try {
+      rel = `assets/${await invoke<string>('copy_image_to_assets', { src: abs, destDir: docDir })}`;
+    } catch (e) {
+      console.error('[Kova] copy media to assets failed:', e);
+      warn('Could not copy media — on macOS, grant Kova access under System Settings → Privacy & Security → Files and Folders.');
+      return null;
+    }
+  }
+  const enc = encodeMarkdownPath(rel);
+  return VIDEO_EXT.test(abs) ? `!video[${label}](${enc})` : `![${label}](${enc})`;
+}
+
 
 const DEFAULT_FONT_SIZE = 14;
 const SCROLLER_BASE = { lineHeight: '1.7' };
@@ -718,19 +747,18 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
   // Handle OS file drops via Tauri's drag-drop window event.
   // The browser File API never exposes paths; this is the only reliable source.
   useEffect(() => {
-    const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp|bmp|ico|avif|tiff?)$/i;
-    const dragHasImages = { current: false };
+    const dragHasMedia = { current: false };
 
     const unlisten = getCurrentWindow().onDragDropEvent((evt) => {
       const p = evt.payload;
 
       if (p.type === 'enter') {
-        dragHasImages.current = p.paths.some((f) => IMAGE_EXT.test(f));
+        dragHasMedia.current = p.paths.some((f) => MEDIA_EXT.test(f));
         return;
       }
 
       if (p.type === 'over') {
-        if (!dragHasImages.current) return;
+        if (!dragHasMedia.current) return;
         const rect = containerRef.current?.getBoundingClientRect();
         const overEditor = !!rect
           && p.position.x >= rect.left && p.position.x <= rect.right
@@ -741,62 +769,35 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
 
       if (p.type === 'leave') {
         setDragActive(false);
-        dragHasImages.current = false;
+        dragHasMedia.current = false;
         return;
       }
 
       if (p.type === 'drop') {
         setDragActive(false);
-        dragHasImages.current = false;
+        dragHasMedia.current = false;
 
         const { x, y } = p.position;
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect || x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return;
 
-        const imagePaths = [...new Set(p.paths.filter((f) => IMAGE_EXT.test(f)))];
-        if (!imagePaths.length) return;
+        const mediaPaths = [...new Set(p.paths.filter((f) => MEDIA_EXT.test(f)))];
+        if (!mediaPaths.length) return;
 
         const view = viewRef.current;
         if (!view) return;
 
         const pos = view.posAtCoords({ x, y }) ?? view.state.doc.length;
         const docPath = filePathRef.current ?? null;
-        const docDir  = docPath
-          ? docPath.substring(0, Math.max(docPath.lastIndexOf('/'), docPath.lastIndexOf('\\')))
-          : null;
+        if (!docPath) {
+          onWarnRef.current?.('Save your document first before dropping media.');
+          return;
+        }
 
         void (async () => {
-          const inserts = await Promise.all(imagePaths.map(async (abs) => {
-            const label = abs.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') ?? 'image';
-            let imgPath: string;
-
-            if (!docDir) {
-              onWarnRef.current?.('Save your document first before dropping images.');
-              return null;
-            }
-
-            const normAbs = abs.replace(/\\/g, '/');
-            const normDir = docDir.replace(/\\/g, '/');
-            if (normAbs.startsWith(normDir + '/')) {
-              // Already inside the document folder — use a relative path.
-              imgPath = makeRelativePath(docPath!, abs);
-            } else {
-              // Outside the document folder — copy into assets/ to avoid
-              // macOS permission issues with protected directories (Desktop, etc.).
-              try {
-                const filename = await invoke<string>('copy_image_to_assets', { src: abs, destDir: docDir });
-                imgPath = `assets/${filename}`;
-              } catch (e) {
-                console.error('[Kova] copy_image_to_assets failed:', e);
-                onWarnRef.current?.(
-                  'Could not copy image — on macOS, grant Kova access under System Settings → Privacy & Security → Files and Folders.'
-                );
-                return null;
-              }
-            }
-
-            return `![${label}](${encodeMarkdownPath(imgPath)})`;
-          }));
+          const inserts = await Promise.all(
+            mediaPaths.map((abs) => buildMediaSnippet(abs, docPath, (m) => onWarnRef.current?.(m))),
+          );
 
           const validInserts = inserts.filter((s): s is string => s !== null);
           if (!validInserts.length) return;
@@ -826,17 +827,18 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
       const handler = (e: ClipboardEvent) => {
         const items = e.clipboardData?.items;
         if (!items) return;
-        const imageItem = Array.from(items).find((item) => item.type.startsWith('image/'));
-        if (!imageItem) return; // no image — let CodeMirror handle text paste natively
+        const mediaItem = Array.from(items).find((item) => item.type.startsWith('image/') || item.type.startsWith('video/'));
+        if (!mediaItem) return; // no media — let CodeMirror handle text paste natively
         e.preventDefault();
-        const blob = imageItem.getAsFile();
+        const blob = mediaItem.getAsFile();
         if (!blob) return;
+        const isVideo = blob.type.startsWith('video/');
         const view = viewRef.current;
         if (!view) return;
         void (async () => {
           const docPath = filePathRef.current ?? null;
           if (!docPath) {
-            onWarnRef.current?.('Save your document first before pasting images.');
+            onWarnRef.current?.('Save your document first before pasting media.');
             return;
           }
           const docDir = docPath.substring(
@@ -844,7 +846,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             Math.max(docPath.lastIndexOf('/'), docPath.lastIndexOf('\\'))
           );
           const arrayBuffer = await blob.arrayBuffer();
-          const pasteExt = blob.type.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+          const pasteExt = blob.type.split('/')[1]?.replace('jpeg', 'jpg') ?? (isVideo ? 'mp4' : 'png');
           const imageBase64 = btoa(
             Array.from(new Uint8Array(arrayBuffer)).map((b) => String.fromCharCode(b)).join('')
           );
@@ -854,7 +856,8 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
               filename: `paste-${Date.now()}.${pasteExt}`,
               destDir: docDir,
             });
-            const snippet = `![](assets/${encodeMarkdownPath(savedFilename)})`;
+            const enc = encodeMarkdownPath(savedFilename);
+            const snippet = isVideo ? `!video[](assets/${enc})` : `![](assets/${enc})`;
             const { from, to } = view.state.selection.main;
             view.dispatch({
               changes: { from, to, insert: snippet },
@@ -862,8 +865,8 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             });
             view.focus();
           } catch (err) {
-            console.error('[Kova] paste image failed:', err);
-            onWarnRef.current?.('Could not paste image.');
+            console.error('[Kova] paste media failed:', err);
+            onWarnRef.current?.('Could not paste media.');
           }
         })();
       };
@@ -1211,14 +1214,14 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
           { type: 'item', label: 'Table', action: () => { setTableRows(3); setTableCols(3); setTablePromptOpen(true); } },
           { type: 'item', label: 'Horizontal Rule', action: () => doInsert('\n<hr>\n', 5) },
           {
-            type: 'item', label: 'Image', action: async () => {
+            type: 'item', label: 'Image or Video…', action: async () => {
               // Resolve the document path before opening any picker.
               // If unsaved, explain why and offer to save first.
               let docPath = filePathRef.current ?? null;
               if (!docPath) {
                 const ok = await showConfirmRef.current(
                   'Save document first',
-                  'Your document needs to be saved before inserting an image, so Kova knows where to place it.',
+                  'Your document needs to be saved before inserting media, so Kova knows where to place it.',
                   'Save',
                 );
                 if (!ok) return;
@@ -1228,30 +1231,12 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
 
               const selected = await openFileDialog({
                 multiple: false,
-                filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'avif', 'tiff'] }],
+                filters: [{ name: 'Media', extensions: ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'avif', 'tiff', 'mp4', 'webm', 'ogg', 'ogv', 'mov', 'm4v', 'mkv'] }],
               });
               if (!selected) return;
-              const abs = selected;
-              const label = abs.split(/[/\\]/).pop()?.replace(/\.[^.]+$/, '') ?? 'image';
-              const docDir = docPath.substring(0, Math.max(docPath.lastIndexOf('/'), docPath.lastIndexOf('\\')));
 
-              let imgPath: string;
-              const normAbs = abs.replace(/\\/g, '/');
-              const normDir = docDir.replace(/\\/g, '/');
-              if (normAbs.startsWith(normDir + '/')) {
-                imgPath = makeRelativePath(docPath, abs);
-              } else {
-                try {
-                  const filename = await invoke<string>('copy_image_to_assets', { src: abs, destDir: docDir });
-                  imgPath = `assets/${filename}`;
-                } catch (e) {
-                  console.error('[Kova] copy_image_to_assets failed:', e);
-                  onWarnRef.current?.('Could not copy image — on macOS, grant Kova access under System Settings → Privacy & Security → Files and Folders.');
-                  return;
-                }
-              }
-
-              const snippet = `![${label}](${encodeMarkdownPath(imgPath)})`;
+              const snippet = await buildMediaSnippet(selected, docPath, (m) => onWarnRef.current?.(m));
+              if (!snippet) return;
               const view = viewRef.current;
               if (!view) return;
               const { from, to } = view.state.selection.main;
