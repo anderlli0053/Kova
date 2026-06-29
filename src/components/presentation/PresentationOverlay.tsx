@@ -128,6 +128,12 @@ export function PresentationOverlay({
           break;
         case 'Escape':
           e.preventDefault(); e.stopPropagation(); onExit(); break;
+        default:
+          // Type a digit to open the slide-jump input (then Enter to go).
+          if (/^[0-9]$/.test(e.key)) {
+            e.preventDefault(); e.stopPropagation();
+            setJumpInput(e.key);
+          }
       }
     };
     window.addEventListener('keydown', handler, true);
