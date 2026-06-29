@@ -246,6 +246,30 @@ describe('element parsing', () => {
   });
 });
 
+// ── List inline markdown ──────────────────────────────────────────────────────
+
+describe('list inline markdown', () => {
+  it('renders bold inline markdown in list items', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n- **bold** item\n'));
+    const list = slides[0].elements.find((e) => e.type === 'list');
+    expect(list?.type === 'list' && list.items[0].html).toContain('<strong>bold</strong>');
+    expect(list?.type === 'list' && list.items[0].text).toContain('bold');
+  });
+
+  it('renders italic and link inline markdown in list items', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n- *emphasis* and [docs](https://example.com)\n'));
+    const list = slides[0].elements.find((e) => e.type === 'list');
+    expect(list?.type === 'list' && list.items[0].html).toContain('<em>emphasis</em>');
+    expect(list?.type === 'list' && list.items[0].html).toContain('<a href="https://example.com">docs</a>');
+  });
+
+  it('renders inline formatting in nested list child items', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n- Parent\n  - **nested bold**\n'));
+    const list = slides[0].elements.find((e) => e.type === 'list');
+    expect(list?.type === 'list' && list.items[0].children[0].html).toContain('<strong>nested bold</strong>');
+  });
+});
+
 // ── Inline formatting ─────────────────────────────────────────────────────────
 
 describe('inline HTML generation', () => {
