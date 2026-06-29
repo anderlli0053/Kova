@@ -29,6 +29,41 @@ describe('extractFrontmatter', () => {
     expect(body).toBe(input);
   });
 
+  it('preserves boolean and number scalar types', () => {
+    const { frontmatter } = extractFrontmatter('---\npaginate: true\ndate: 2024\n---\n\n# Slide\n');
+    expect(frontmatter['paginate']).toBe(true);
+    expect(frontmatter['date']).toBe(2024);
+  });
+
+  it('returns an empty body when nothing follows the closing ---', () => {
+    const { frontmatter, body } = extractFrontmatter('---\ntitle: X\n---\n');
+    expect(frontmatter.title).toBe('X');
+    expect(body).toBe('');
+  });
+
+  it('returns the full content as body when frontmatter YAML is malformed', () => {
+    const input = '---\n: bad: yaml:\n---\n\n# Slide\n';
+    const { frontmatter, body } = extractFrontmatter(input);
+    expect(frontmatter).toEqual({});
+    // Body retains the entire document so a downstream parse still sees the heading.
+    expect(body).toBe(input);
+    expect(body).toContain('# Slide');
+  });
+
+  it('extracts a partial theme_overrides map with only colors', () => {
+    const input = [
+      '---',
+      'theme_overrides:',
+      '  colors:',
+      '    primary: "#FF0000"',
+      '---',
+      '',
+      '# Slide',
+    ].join('\n');
+    const { frontmatter } = extractFrontmatter(input);
+    expect(frontmatter.theme_overrides).toEqual({ colors: { primary: '#FF0000' } });
+  });
+
   it('parses nested theme_overrides maps', () => {
     const input = [
       '---',
