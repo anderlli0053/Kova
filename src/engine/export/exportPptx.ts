@@ -606,7 +606,22 @@ function addMediaSlide(s: PS, slide: Slide, t: Theme, cy: number, ch: number) {
   const bodyY = cy + hh + 0.1;
   const bodyH = ch - hh - 0.1;
   const yt    = slide.elements.find((e) => e.type === 'youtube');
+  const vid   = slide.elements.find((e) => e.type === 'video');
   const poll  = slide.elements.find((e) => e.type === 'poll');
+
+  // ponytail: PPTX can't embed local video without bundling the file — emit a
+  // labelled placeholder, same as the YouTube branch. Real embed is the upgrade path.
+  if (vid && vid.type === 'video') {
+    s.addText([
+      { text: '▶ ', options: { fontSize: 30, bold: true } },
+      { text: vid.label || 'Video', options: { fontSize: 20, breakLine: true } },
+      { text: vid.src, options: { fontSize: 11, color: hex(t.colors.accent) } },
+    ], {
+      x: M, y: bodyY, w: W - M * 2, h: bodyH,
+      color: hex(t.colors.text), fontFace: firstFont(t.fonts.body),
+      align: 'center', valign: 'middle', wrap: true,
+    });
+  }
 
   const both  = yt && poll;
   const halfH = (bodyH - 0.2) / 2;
