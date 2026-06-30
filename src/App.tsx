@@ -42,6 +42,7 @@ import { BUILT_IN_THEMES, DEFAULT_THEME, parseThemeYaml, sanitiseThemeOverrides,
 import { registerBundledFonts, registerCachedFont } from './engine/bundledFonts';
 import type { Slide, Frontmatter, ListItem } from './engine/types';
 import { parseAspectRatio } from './engine/types';
+import { extToMime } from './engine/export/imageMime';
 import type { Theme } from './engine/theme';
 
 import './styles/global.css';
@@ -217,11 +218,7 @@ export default function App() {
     if (!raw) { setResolvedLogoUrl(undefined); return; }
     if (/^(https?:|data:)/i.test(raw)) { setResolvedLogoUrl(raw); return; }
     const ext  = raw.replace(/\\/g, '/').split('.').pop()?.toLowerCase() ?? 'png';
-    const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
-               : ext === 'svg'  ? 'image/svg+xml'
-               : ext === 'gif'  ? 'image/gif'
-               : ext === 'webp' ? 'image/webp'
-               : 'image/png';
+    const mime = extToMime(ext);
     invoke<string>('read_file_b64', { path: raw })
       .then((b64) => setResolvedLogoUrl(`data:${mime};base64,${b64}`))
       .catch(() => setResolvedLogoUrl(undefined));
