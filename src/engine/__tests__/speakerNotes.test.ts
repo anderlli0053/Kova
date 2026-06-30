@@ -51,4 +51,16 @@ describe('extractSpeakerNotes', () => {
     expect(content).toBe('');
     expect(notes).toBe('');
   });
+
+  it('only splits on the first ??? — a second marker stays verbatim in notes', () => {
+    const { content, notes } = extractSpeakerNotes('Body\n\n???\n\nNote one\n\n???\n\nNote two');
+    expect(content).toBe('Body');
+    expect(notes).toBe('Note one\n\n???\n\nNote two');
+  });
+
+  it('splits on ??? inside a ~~~ tilde fence (only backtick fences are recognised)', () => {
+    const { content, notes } = extractSpeakerNotes('~~~\n???\n~~~\n\nAfter');
+    expect(content).toBe('~~~');
+    expect(notes).toBe('~~~\n\nAfter');
+  });
 });
