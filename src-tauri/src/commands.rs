@@ -1389,16 +1389,17 @@ mod platform_windows {
                 let path_wide: Vec<u16> =
                     output.encode_utf16().chain(std::iter::once(0)).collect();
 
+                let tx_handler = tx.clone();
                 let handler =
                     PrintToPdfCompletedHandler::create(Box::new(move |err, is_successful| {
                         if let Err(e) = err {
-                            let _ = tx.send(Err(format!("PrintToPdf error: {e}")));
+                            let _ = tx_handler.send(Err(format!("PrintToPdf error: {e}")));
                         } else if !is_successful {
-                            let _ = tx.send(Err(
+                            let _ = tx_handler.send(Err(
                                 "PrintToPdf completed but reported failure".into(),
                             ));
                         } else {
-                            let _ = tx.send(Ok(()));
+                            let _ = tx_handler.send(Ok(()));
                         }
                         Ok(())
                     }));
