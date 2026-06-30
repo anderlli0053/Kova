@@ -498,6 +498,19 @@ export default function App() {
   // Load custom themes from the platform config dir on startup
   useEffect(() => { reloadCustomThemes(); }, [reloadCustomThemes]);
 
+  // Resolve a formerly-missing theme once custom themes finish loading.
+  // Fixes a startup race: if the session file loads before load_custom_themes
+  // returns, applyFileContent marks the theme missing even though it is installed.
+  useEffect(() => {
+    if (!missingThemeId) return;
+    const found = allThemes.find((t) => t.id === missingThemeId);
+    if (!found) return;
+    const { frontmatter: fm } = extractFrontmatter(contentRef.current);
+    setActiveThemeId(found.id);
+    setMissingThemeId(null);
+    setThemeOverrides(sanitiseThemeOverrides(fm.theme_overrides as Record<string, unknown> ?? {}));
+  }, [allThemes, missingThemeId]);
+
   // Load keybindings from the platform config dir on startup
   useEffect(() => {
     loadKeybindings().then(setKeybindings).catch(() => {});
