@@ -97,6 +97,18 @@ describe('formatCombo', () => {
   it('handles multi-character keys', () => {
     expect(formatCombo('ctrl+escape')).toBe('Ctrl+Escape');
   });
+
+  it('formats a ctrl+alt composite combo', () => {
+    expect(formatCombo('ctrl+alt+f')).toBe('Ctrl+Alt+F');
+  });
+
+  it('formats a meta composite combo as Cmd', () => {
+    expect(formatCombo('meta+k')).toBe('Cmd+K');
+  });
+
+  it('capitalises every segment of a three-part combo with a multi-char key', () => {
+    expect(formatCombo('ctrl+shift+arrowup')).toBe('Ctrl+Shift+Arrowup');
+  });
 });
 
 // ── getCombo ──────────────────────────────────────────────────────────────────
