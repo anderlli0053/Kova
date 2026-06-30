@@ -102,8 +102,8 @@ describe('formatCombo', () => {
     expect(formatCombo('ctrl+alt+f')).toBe('Ctrl+Alt+F');
   });
 
-  it('formats a meta composite combo as Cmd', () => {
-    expect(formatCombo('meta+k')).toBe('Cmd+K');
+  it('formats a meta composite combo as Cmd alongside another modifier', () => {
+    expect(formatCombo('meta+shift+k')).toBe('Cmd+Shift+K');
   });
 
   it('capitalises every segment of a three-part combo with a multi-char key', () => {
