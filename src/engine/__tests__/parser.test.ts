@@ -402,6 +402,30 @@ describe('custom syntax pre-processor', () => {
     expect(bars).toHaveLength(3);
     expect(bars.map((b) => b.type === 'progress' && b.label)).toEqual(['A', 'B', 'C']);
   });
+
+  it('treats a !youtube directive with no URL as plain text, not an embed', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n!youtube[Demo]\n'));
+    expect(slides[0].elements.some((e) => e.type === 'youtube')).toBe(false);
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(para?.type === 'paragraph' && para.text).toContain('youtube');
+  });
+
+  it('treats a !progress directive with no value as plain text, not a bar', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n!progress[Load]\n'));
+    expect(slides[0].elements.some((e) => e.type === 'progress')).toBe(false);
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(para?.type === 'paragraph' && para.text).toContain('progress');
+  });
+
+  it('does not treat a !progress directive with a non-numeric value as a bar', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n!progress[Load](abc)\n'));
+    expect(slides[0].elements.some((e) => e.type === 'progress')).toBe(false);
+    // [Load](abc) becomes an ordinary markdown link once the directive regex
+    // fails; the scheme-less URL is sanitised to "#".
+    const para = slides[0].elements.find((e) => e.type === 'paragraph');
+    expect(para?.type === 'paragraph' && para.html).toContain('<a href="#">Load</a>');
+    expect(para?.type === 'paragraph' && para.text).toContain('progress');
+  });
 });
 
 // ── Academic references (!ref) ────────────────────────────────────────────────
