@@ -462,6 +462,18 @@ describe('column breaks', () => {
     const { slides } = parseDocument(doc('## Slide\n\nLeft\n\n|||\n\nRight\n'));
     expect(slides[0].layout).toBe('two-column');
   });
+
+  it('inserts a column-break element for each ||| on the slide', () => {
+    const { slides } = parseDocument(doc('## Slide\n\nA\n\n|||\n\nB\n\n|||\n\nC\n'));
+    const breaks = slides[0].elements.filter((e) => e.type === 'column-break');
+    expect(breaks).toHaveLength(2);
+  });
+
+  it('preserves order of content and multiple column-breaks', () => {
+    const { slides } = parseDocument(doc('## Slide\n\nA\n\n|||\n\nB\n\n|||\n\nC\n'));
+    const types = slides[0].elements.map((e) => e.type);
+    expect(types).toEqual(['paragraph', 'column-break', 'paragraph', 'column-break', 'paragraph']);
+  });
 });
 
 // ── Speaker notes ─────────────────────────────────────────────────────────────
