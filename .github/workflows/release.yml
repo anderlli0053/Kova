@@ -160,6 +160,27 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
+      # Save this platform's latest.json as a workflow artifact so the finalize
+      # job can merge all three into one before uploading to the release.
+      # Without this, each platform overwrites the shared latest.json in the
+      # release, and whichever platform finishes last wins — dropping the others.
+      - name: Save platform latest.json artifact
+        shell: bash
+        run: |
+          LATEST=$(find src-tauri/target -name "latest.json" | head -1)
+          if [ -z "$LATEST" ]; then
+            echo "latest.json not found — skipping artifact upload"
+            exit 0
+          fi
+          mkdir -p /tmp/platform-latest
+          cp "$LATEST" /tmp/platform-latest/latest.json
+          echo "Found: $LATEST"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: latest-json-${{ matrix.platform }}
+          path: /tmp/platform-latest/latest.json
+          if-no-files-found: warn
+
       # Submit the signed DMG to Apple, then wait up to 10 minutes for acceptance,
       # and staple the notarisation ticket so Gatekeeper works offline.
       - name: Notarise and staple macOS DMG
@@ -267,6 +288,29 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Download per-platform latest.json artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: latest-json-*
+          path: /tmp/platform-latest-jsons
+
+      - name: Merge latest.json across all platforms
+        run: |
+          set -euo pipefail
+          # Combine the "platforms" objects from all per-platform latest.json files
+          # into a single merged latest.json, then upload it to the release.
+          find /tmp/platform-latest-jsons -name "latest.json" \
+            | xargs jq -sc '
+                .[0] as $base |
+                { version: $base.version, notes: $base.notes, pub_date: $base.pub_date,
+                  platforms: (reduce .[].platforms as $p ({}; . * $p)) }
+              ' > /tmp/latest.json
+          echo "Merged platforms:" && jq '.platforms | keys' /tmp/latest.json
+          gh release upload "${{ github.ref_name }}" /tmp/latest.json \
+            -R KovaMD/Kova --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Add stable download aliases and remove .sig files
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
