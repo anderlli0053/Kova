@@ -101,7 +101,7 @@ html, body {
   break-after: page;
   page-break-after: always;
   position: relative !important;
-  margin: 16px auto !important;
+  margin: 0 !important;
 }
 .kova-page:last-child {
   break-after: avoid;

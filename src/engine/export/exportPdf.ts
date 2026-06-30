@@ -5,6 +5,7 @@ import { mermaidSvgCache } from './mermaidSvgCache';
 import { svgToPngDataUrl } from './svgToPng';
 import { queuedMermaidRender } from './mermaidRenderQueue';
 import { imageMime } from './imageMime';
+import { buildExportMermaidInit } from './mermaidExportTheme';
 import type { AspectRatio } from '../types';
 import type { Theme } from '../theme';
 
@@ -54,8 +55,17 @@ async function captureSlide(slideEl: HTMLElement, theme: Theme): Promise<string>
   // Pre-resolve asset:// and remote https:// images to data: URLs so the canvas stays untainted on macOS.
   await preResolveExternalImages(slideEl);
 
-  // Step 1: base screenshot — Mermaid areas may be placeholders or broken SVG,
-  // but all other content (background, text, images) captures correctly.
+  // WebKitGTK's foreignObject renderer (used by html-to-image) does not paint
+  // <img> elements even when src is already a data: URL — the image area comes
+  // out blank while text and backgrounds render correctly. Work around this by
+  // hiding every <img> before the base capture, then compositing each one
+  // manually onto the canvas afterwards, exactly as mermaid diagrams are handled.
+  const imgs = Array.from(slideEl.querySelectorAll<HTMLImageElement>('img'));
+  imgs.forEach((img) => { img.style.visibility = 'hidden'; });
+
+  // Step 1: base screenshot — image areas are blank placeholders; Mermaid
+  // containers may also be placeholders. Everything else (backgrounds, text,
+  // shapes, layout) is captured here.
   const baseJpeg = await toJpeg(slideEl, {
     quality: JPEG_QUALITY,
     pixelRatio: PIXEL_RATIO,
@@ -77,13 +87,32 @@ async function captureSlide(slideEl: HTMLElement, theme: Theme): Promise<string>
     img.src = baseJpeg;
   });
 
-  // Step 3: find every Mermaid container in this slide.
-  // [data-mermaid-src] is present on both the loading and rendered states.
+  // Step 3: restore image visibility and composite each <img> onto the canvas.
+  // getBoundingClientRect is valid even while visibility:hidden (layout is unchanged).
   const slideRect = slideEl.getBoundingClientRect();
+  imgs.forEach((img) => { img.style.visibility = ''; });
+  await Promise.all(imgs.map((img) => new Promise<void>((resolve) => {
+    const paint = () => {
+      if (img.naturalWidth === 0 || img.naturalHeight === 0) { resolve(); return; }
+      const r   = img.getBoundingClientRect();
+      const cx  = (r.left   - slideRect.left) * PIXEL_RATIO;
+      const cy  = (r.top    - slideRect.top)  * PIXEL_RATIO;
+      const cw  = r.width   * PIXEL_RATIO;
+      const ch  = r.height  * PIXEL_RATIO;
+      // object-fit: contain — scale to fit while preserving aspect ratio, centred.
+      const scale = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+      const fitW  = img.naturalWidth  * scale;
+      const fitH  = img.naturalHeight * scale;
+      ctx.drawImage(img, cx + (cw - fitW) / 2, cy + (ch - fitH) / 2, fitW, fitH);
+      resolve();
+    };
+    if (img.complete) { paint(); } else { img.onload = paint; img.onerror = () => resolve(); }
+  })));
+
+  // Step 4: composite each Mermaid diagram on top.
+  // [data-mermaid-src] is present on both the loading and rendered states.
   const containers = Array.from(slideEl.querySelectorAll<HTMLElement>('[data-mermaid-src]'));
 
-  // Step 4: for each diagram, get its source, rasterise it, and paint it on
-  // top of the canvas at the correct position.
   for (const container of containers) {
     const source = container.getAttribute('data-mermaid-src')!;
 
@@ -94,8 +123,10 @@ async function captureSlide(slideEl: HTMLElement, theme: Theme): Promise<string>
       // that mount simultaneously for this very export), not just other
       // diagrams within this loop — see mermaidRenderQueue.ts.
       try {
+        const init = buildExportMermaidInit(theme);
+        const src  = source.trimStart().startsWith('%%{') ? source : init + source;
         const id = `pdf-mermaid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const result = await queuedMermaidRender(id, source);
+        const result = await queuedMermaidRender(id, src);
         mermaidSvgCache.set(source, result.svg);
         cached = result.svg;
       } catch {

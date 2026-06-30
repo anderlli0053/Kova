@@ -59,6 +59,7 @@ export function PresenterOverlay({
   const [jumpInput, setJumpInput]       = useState<string | null>(null);
   const [laserPos, setLaserPos]         = useState<{ x: number; y: number } | null>(null);
   const startTime      = useRef(Date.now());
+  const lastWheelTime  = useRef(0);
   const overlayRef     = useRef<HTMLDivElement>(null);
   const currentFrameRef = useRef<HTMLDivElement>(null);
   const nextFrameRef    = useRef<HTMLDivElement>(null);
@@ -183,11 +184,28 @@ export function PresenterOverlay({
           setLaserActive((p) => !p); break;
         case 'Escape':
           e.preventDefault(); e.stopPropagation(); onExit(); break;
+        default:
+          if (/^\d$/.test(e.key)) {
+            e.preventDefault(); e.stopPropagation();
+            setJumpInput(e.key);
+          }
       }
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
   }, [goNext, goPrev, onNavigate, total, onExit]);
+
+  useEffect(() => {
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const now = Date.now();
+      if (now - lastWheelTime.current < 300) return;
+      lastWheelTime.current = now;
+      if (e.deltaY > 0) goNext(); else goPrev();
+    };
+    window.addEventListener('wheel', handler, { passive: false });
+    return () => window.removeEventListener('wheel', handler);
+  }, [goNext, goPrev]);
 
   if (!slide) return null;
 

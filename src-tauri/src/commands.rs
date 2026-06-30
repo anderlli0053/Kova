@@ -1354,8 +1354,8 @@ mod platform_windows {
     pub async fn generate_pdf(
         window: &WebviewWindow,
         output_path: &str,
-        _width_mm: f64,
-        _height_mm: f64,
+        width_mm: f64,
+        height_mm: f64,
     ) -> Result<(), String> {
         let (tx, rx) = std::sync::mpsc::sync_channel::<Result<(), String>>(1);
         let output = output_path.to_string();
@@ -1363,7 +1363,7 @@ mod platform_windows {
         window
             .with_webview(move |wv| {
                 use webview2_com::{
-                    Microsoft::Web::WebView2::Win32::ICoreWebView2_7,
+                    Microsoft::Web::WebView2::Win32::{ICoreWebView2_7, ICoreWebView2Environment6},
                     PrintToPdfCompletedHandler,
                 };
                 use windows::core::{Interface, PCWSTR};
@@ -1384,6 +1384,24 @@ mod platform_windows {
                         return;
                     }
                 };
+
+                // Build PrintSettings with the slide's exact page dimensions and no
+                // margins. PageWidth/PageHeight are in inches (1 in = 25.4 mm). Falls
+                // back to None on older WebView2 runtimes so the call still succeeds.
+                let print_settings = wv
+                    .environment()
+                    .cast::<ICoreWebView2Environment6>()
+                    .ok()
+                    .and_then(|env6| unsafe { env6.CreatePrintSettings() }.ok())
+                    .and_then(|s| unsafe {
+                        let _ = s.put_PageWidth(width_mm / 25.4);
+                        let _ = s.put_PageHeight(height_mm / 25.4);
+                        let _ = s.put_MarginTop(0.0);
+                        let _ = s.put_MarginBottom(0.0);
+                        let _ = s.put_MarginLeft(0.0);
+                        let _ = s.put_MarginRight(0.0);
+                        Some(s)
+                    });
 
                 // Encode file path as NUL-terminated UTF-16.
                 let path_wide: Vec<u16> =
@@ -1407,7 +1425,11 @@ mod platform_windows {
                 // PrintToPdf copies the path string synchronously, so path_wide
                 // only needs to live until this call returns.
                 if let Err(e) = unsafe {
-                    webview7.PrintToPdf(PCWSTR(path_wide.as_ptr()), None, &handler)
+                    webview7.PrintToPdf(
+                        PCWSTR(path_wide.as_ptr()),
+                        print_settings.as_ref(),
+                        &handler,
+                    )
                 } {
                     let _ = tx.send(Err(format!("PrintToPdf call failed: {e}")));
                 }

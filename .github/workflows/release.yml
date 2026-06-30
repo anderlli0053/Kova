@@ -164,11 +164,14 @@ jobs:
       # job can merge all three into one before uploading to the release.
       # Without this, each platform overwrites the shared latest.json in the
       # release, and whichever platform finishes last wins — dropping the others.
+      # tauri-action writes latest.json to the project root (process.cwd()),
+      # not under src-tauri/target — it's generated in the action's Node
+      # process and only ever touches the bundle dir for the .sig files.
       - name: Save platform latest.json artifact
         shell: bash
         run: |
-          LATEST=$(find src-tauri/target -name "latest.json" | head -1)
-          if [ -z "$LATEST" ]; then
+          LATEST="latest.json"
+          if [ ! -f "$LATEST" ]; then
             echo "latest.json not found — skipping artifact upload"
             exit 0
           fi
@@ -299,8 +302,13 @@ jobs:
           set -euo pipefail
           # Combine the "platforms" objects from all per-platform latest.json files
           # into a single merged latest.json, then upload it to the release.
-          find /tmp/platform-latest-jsons -name "latest.json" \
-            | xargs jq -sc '
+          mkdir -p /tmp/platform-latest-jsons
+          mapfile -t JSON_FILES < <(find /tmp/platform-latest-jsons -name "latest.json")
+          if [ "${#JSON_FILES[@]}" -eq 0 ]; then
+            echo "::error::No per-platform latest.json artifacts were downloaded — nothing to merge." >&2
+            exit 1
+          fi
+          printf '%s\n' "${JSON_FILES[@]}" | xargs jq -sc '
                 .[0] as $base |
                 { version: $base.version, notes: $base.notes, pub_date: $base.pub_date,
                   platforms: (reduce .[].platforms as $p ({}; . * $p)) }
