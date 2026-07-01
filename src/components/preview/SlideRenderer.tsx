@@ -580,12 +580,14 @@ function GridLayout({ slide }: { slide: Slide }) {
 
 function MediaLayout({ slide }: { slide: Slide }) {
   const yt = slide.elements.find((e) => e.type === 'youtube');
+  const vid = slide.elements.find((e) => e.type === 'video');
   const poll = slide.elements.find((e) => e.type === 'poll');
   return (
     <div className="sl-media">
       {slide.title && <div className="sl-heading sl-media__title">{slide.title}</div>}
       <div className="sl-media__body">
         {yt && yt.type === 'youtube' && <YoutubeEmbed embed={yt} />}
+        {vid && vid.type === 'video' && <VideoEmbed embed={vid} />}
         {poll && poll.type === 'poll' && <PollEmbed embed={poll} />}
       </div>
     </div>
@@ -713,6 +715,9 @@ function ElementNode({ el }: { el: SlideElement }) {
     case 'youtube':
       return <YoutubeEmbed embed={el} />;
 
+    case 'video':
+      return <VideoEmbed embed={el} />;
+
     case 'poll':
       return <PollEmbed embed={el} />;
 
@@ -799,6 +804,17 @@ function YoutubeEmbed({ embed }: { embed: Extract<SlideElement, { type: 'youtube
       }
       <div className="sl-youtube__label">{embed.label}</div>
       {!isThumbnail && <div className="sl-youtube__open-hint">Click to open in browser</div>}
+    </div>
+  );
+}
+
+function VideoEmbed({ embed }: { embed: Extract<SlideElement, { type: 'video' }> }) {
+  const { isThumbnail } = useContext(SlideCtx);
+  return (
+    // stopPropagation so the player's controls don't trigger slide navigation.
+    <div className="sl-video" onClick={(e) => e.stopPropagation()}>
+      <video className="sl-video__player" src={embed.src} controls={!isThumbnail} preload="metadata" playsInline />
+      {embed.label && <div className="sl-video__label">{embed.label}</div>}
     </div>
   );
 }

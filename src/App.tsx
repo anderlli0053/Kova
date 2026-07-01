@@ -427,7 +427,7 @@ export default function App() {
       const resolved: Slide = {
         ...slide,
         elements: slide.elements.map((el) => {
-          if (el.type === 'image')     return { ...el, src: resolveImageSrc(el.src, docDir, localImageUrls) };
+          if (el.type === 'image' || el.type === 'video') return { ...el, src: resolveImageSrc(el.src, docDir, localImageUrls) };
           if (el.type === 'paragraph') return { ...el, html: resolveHtmlSrcs(el.html, docDir, localImageUrls) };
           if (el.type === 'list')      return { ...el, items: el.items.map(resolveItem) };
           if (el.type === 'toc')       return { ...el, entries: tocEntries.filter((e) => e.index !== slide.index) };

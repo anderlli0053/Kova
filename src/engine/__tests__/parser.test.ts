@@ -345,6 +345,13 @@ describe('custom syntax pre-processor', () => {
     expect(yt?.type === 'youtube' && yt.url).toBe('https://youtu.be/abc123');
   });
 
+  it('parses !video', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n!video[Clip](media/demo.mp4)\n'));
+    const vid = slides[0].elements.find((e) => e.type === 'video');
+    expect(vid?.type === 'video' && vid.label).toBe('Clip');
+    expect(vid?.type === 'video' && vid.src).toBe('media/demo.mp4');
+  });
+
   it('parses !poll', () => {
     const { slides } = parseDocument(doc('## Slide\n\n!poll[Vote here](https://pollev.com/xyz)\n'));
     const poll = slides[0].elements.find((e) => e.type === 'poll');
