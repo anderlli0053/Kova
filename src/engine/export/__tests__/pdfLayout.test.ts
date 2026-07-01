@@ -46,4 +46,17 @@ describe('pdfLayout', () => {
     expect(p.notesTopPx).toBeGreaterThan(p.marginPx);
     expect(p.notesTopPx).toBeLessThan(p.pageHpx - p.marginPx);
   });
+
+  it('fullBleed sets page size to the slide with no margins and unit scale', () => {
+    const p = planPage(AR, { fullBleed: true });
+    expect(p.mode).toBe('single');
+    expect(p.marginPx).toBe(0);
+    expect(p.gapPx).toBe(0);
+    expect(p.pageWpx).toBe(960);
+    expect(p.slideNativeHpx).toBe(540);
+    expect(p.pageHpx).toBe(540);
+    expect(p.slideScale).toBe(1);
+    expect(p.cols).toBe(1);
+    expect(p.rows).toBe(1);
+  });
 });
