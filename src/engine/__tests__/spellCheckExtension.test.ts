@@ -71,4 +71,25 @@ describe('extractWords', () => {
     expect(ranges[0]).toEqual({ from: 0, to: 4, word: 'Line' });
     expect(ranges[ranges.length - 1]).toEqual({ from: 14, to: 17, word: 'two' });
   });
+
+  it('skips words inside tilde-fenced code blocks', () => {
+    const doc = [
+      'Intro text',
+      '~~~',
+      'const hello = 1',
+      'function world() {}',
+      '~~~',
+      'After code',
+    ].join('\n');
+    expect(words(doc)).toEqual(['Intro', 'text', 'After', 'code']);
+  });
+
+  it('extracts accented Unicode letters', () => {
+    expect(words('café résumé über')).toEqual(['café', 'résumé', 'über']);
+  });
+
+  it('treats a standalone ??? line as containing no words', () => {
+    const doc = 'Before notes\n???\nAfter notes';
+    expect(words(doc)).toEqual(['Before', 'notes', 'After', 'notes']);
+  });
 });
