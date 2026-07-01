@@ -995,12 +995,16 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
     return () => el.removeEventListener('wheel', handler);
   }, []);
 
-  // Sync external content changes
+  // Sync external content changes. CodeMirror normalises \r\n→\n internally, so
+  // a CRLF file on disk always "differs" from the LF doc — ignore CR-only diffs,
+  // else opening an unedited CRLF file fires a spurious change (issue #95).
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
     const current = view.state.doc.toString();
-    if (current !== content) {
+    // `current !== content` is the fast path (equal on every keystroke); only
+    // when they differ do we pay the CRLF-normalising compare.
+    if (current !== content && current !== content.replace(/\r\n/g, '\n')) {
       view.dispatch({ changes: { from: 0, to: current.length, insert: content } });
     }
   }, [content]);
