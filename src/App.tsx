@@ -549,6 +549,10 @@ export default function App() {
         newContent = await invoke('read_file', { path });
       } catch (err) {
         console.error('Failed to reload file:', err);
+        if (isDirtyRef.current) {
+          externalChangePathRef.current = path;
+          setShowExternalChangeDialog(true);
+        }
         return;
       }
 
