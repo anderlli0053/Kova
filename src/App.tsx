@@ -149,6 +149,7 @@ export default function App() {
   const [resolvedUiTheme, setResolvedUiTheme] = useState<'dark' | 'light'>('dark');
   const [fileMenuOpen, setFileMenuOpen]       = useState(false);
   const [importSubmenuOpen, setImportSubmenuOpen] = useState(false);
+  const [exportSubmenuOpen, setExportSubmenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const [editMenuOpen, setEditMenuOpen]       = useState(false);
   const editMenuRef = useRef<HTMLDivElement>(null);
@@ -1658,15 +1659,31 @@ export default function App() {
                 Copy with Assets…
               </button>
               <div className="btn-group-menu-separator" />
-              <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExport(); }}>
-                Export PowerPoint (.pptx)
-              </button>
-              <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); setPdfPerPage(1); setPdfNotesOn(false); setPdfOptionsOpen(true); }}>
-                {pdfExportContext ? 'Exporting PDF…' : 'Export PDF (.pdf)'}
-              </button>
-              <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExportHtml(); }}>
-                {pdfExportContext ? 'Exporting…' : 'Export HTML (.html)'}
-              </button>
+              <div style={{ position: 'relative' }} onMouseEnter={() => setExportSubmenuOpen(true)} onMouseLeave={() => setExportSubmenuOpen(false)}>
+                <button
+                  className="btn-group-menu-item btn-group-menu-item--shortcut"
+                  aria-haspopup="true"
+                  aria-expanded={exportSubmenuOpen}
+                  disabled={slides.length === 0 || pdfExportContext !== null}
+                  onClick={() => setExportSubmenuOpen((p) => !p)}
+                  onKeyDown={(e) => { if (e.key === 'ArrowRight' || e.key === 'Enter') setExportSubmenuOpen(true); }}
+                >
+                  Export <span>›</span>
+                </button>
+                {exportSubmenuOpen && (
+                  <div className="btn-group-menu btn-group-menu--sub">
+                    <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExport(); }}>
+                      PowerPoint (.pptx)
+                    </button>
+                    <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); setPdfPerPage(1); setPdfNotesOn(false); setPdfOptionsOpen(true); }}>
+                      {pdfExportContext ? 'Exporting PDF…' : 'PDF (.pdf)'}
+                    </button>
+                    <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExportHtml(); }}>
+                      {pdfExportContext ? 'Exporting…' : 'HTML (.html)'}
+                    </button>
+                  </div>
+                )}
+              </div>
               <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null || printContext !== null} onClick={() => { setFileMenuOpen(false); handlePrint(); }}>
                 {printContext ? 'Preparing Print…' : 'Print…'}
               </button>
