@@ -33,10 +33,10 @@ jobs:
 
           ### Bug fixes
           - **Fixed blank PDF slides on Windows and invisible images on Linux** — Windows exports could produce extra blank pages from missing paper-size/margin settings; Linux exports dropped embedded images due to a WebKitGTK rendering quirk.
-          - **Fixed invisible Mermaid diagram labels in PDF/PPTX export** — flowchart labels lost their text colour on export (closes #45).
-          - **Fixed "file changed externally" false alarms on OneDrive-synced folders** — file-watcher metadata-only events (timestamps/xattrs touched by sync clients) were mistaken for real edits (reported by @florian-hubertSE, #91).
-          - **Fixed custom theme not applying on startup** — a race between session restore and theme loading could leave the theme unapplied until manually reselected (#90).
-          - **Fixed footer/header template variables being stripped** — custom footer/header text containing `{date}`, `{title}`, `{slide_number}`, or `{total}` was silently reverted to the theme default on reload (#55).
+          - **Fixed invisible Mermaid diagram labels in PDF/PPTX export** — flowchart labels lost their text colour on export (reported by @a1880, #45).
+          - **Fixed "file changed externally" false alarms on OneDrive-synced folders** — file-watcher metadata-only events (timestamps/xattrs touched by sync clients) were mistaken for real edits (reported and fixed by @florian-hubertSE, #91).
+          - **Fixed custom theme not applying on startup** — a race between session restore and theme loading could leave the theme unapplied until manually reselected (reported by @MasterPlay007, #90).
+          - **Fixed footer/header template variables being stripped** — custom footer/header text containing `{date}`, `{title}`, `{slide_number}`, or `{total}` was silently reverted to the theme default on reload (reported by @a1880, #55).
 
           ---
 
