@@ -305,6 +305,9 @@ export default function App() {
   showFrontmatterRef.current = settings.showFrontmatter;
   const contentRef = useRef(content);
   contentRef.current = content;
+  // Last content known to be persisted on disk for the currently watched file.
+  // External-change events that do not alter this snapshot are ignored.
+  const diskContentRef = useRef(content);
   // Updated in render body (not useEffect) so the file-changed listener always
   // sees the current dirty state when it fires synchronously after a watcher event.
   const isDirtyRef = useRef(isDirty);
@@ -541,21 +544,34 @@ export default function App() {
     const unlisten = listen<void>('file-changed', async () => {
       const path = filePathRef.current;
       if (!path) return;
+      let newContent: string;
+      try {
+        newContent = await invoke('read_file', { path });
+      } catch (err) {
+        console.error('Failed to reload file:', err);
+        if (isDirtyRef.current) {
+          externalChangePathRef.current = path;
+          setShowExternalChangeDialog(true);
+        }
+        return;
+      }
+
+      // OneDrive and other sync clients can touch file metadata frequently
+      // without changing the markdown bytes. Ignore those watcher events.
+      if (newContent === diskContentRef.current) return;
+
       if (isDirtyRef.current) {
         // Unsaved edits — block with a modal; user must choose reload or save-as.
+        diskContentRef.current = newContent;
         externalChangePathRef.current = path;
         setShowExternalChangeDialog(true);
       } else {
         // No unsaved edits — reload silently then surface a dismissable banner.
-        try {
-          const newContent: string = await invoke('read_file', { path });
-          setContent(newContent);
-          setIsDirty(false);
-          externalChangePathRef.current = path;
-          setShowExternalChangeDialog(true);
-        } catch (err) {
-          console.error('Failed to reload file:', err);
-        }
+        setContent(newContent);
+        setIsDirty(false);
+        diskContentRef.current = newContent;
+        externalChangePathRef.current = path;
+        setShowExternalChangeDialog(true);
       }
     });
     return () => { unlisten.then((fn) => fn()); };
@@ -904,6 +920,7 @@ export default function App() {
     setFilePath(path);
     setContent(text);
     setIsDirty(false);
+    diskContentRef.current = text;
     setCurrentSlideIndex(0);
     if (path) await invoke('start_watching', { path }).catch(console.error);
     setMarpPrompt(isMarp(text) ? { text, dir: dirOf(path) } : null);
@@ -1100,6 +1117,7 @@ export default function App() {
       const toWrite = buildSaveContent();
       await invoke('write_file', { path: filePath, content: toWrite });
       if (toWrite !== content) setContent(toWrite);
+      diskContentRef.current = toWrite;
       // Re-register the watcher: atomic_write replaces the file's inode via
       // rename, which causes inotify to drop the watch on the old inode.
       // Explicitly re-watching after each save ensures external changes are
@@ -1129,6 +1147,7 @@ export default function App() {
       if (toWrite !== content) setContent(toWrite);
       setFilePath(target);
       setIsDirty(false);
+      diskContentRef.current = toWrite;
       await invoke('start_watching', { path: target }).catch(console.error);
       return target;
     } catch (err) { console.error('Save As failed:', err); setWarnMessage(`Save failed: ${err}`); return null; }
@@ -1975,6 +1994,7 @@ export default function App() {
                         const newContent: string = await invoke('read_file', { path });
                         setContent(newContent);
                         setIsDirty(false);
+                        diskContentRef.current = newContent;
                       } catch (err) { console.error('Failed to reload file:', err); }
                     }}
                   >Reload</button>
