@@ -29,18 +29,14 @@ jobs:
           ## What's new
 
           ### New features
-          - **Markdown tables** — full GFM table support with inline formatting inside cells (requested by @SFZUlm, #48).
-          - **Presenter: slide jump, blank screen, F5 shortcuts** — type a slide number to jump directly; press `B` to blank the screen; `F5` / `Shift+F5` start and exit presentation.
-          - **Presenter: Home / End navigation** — jump to the first or last slide instantly (by @vadika, #47).
-          - **Keyboard slide navigation in editor** — `Alt+↑` / `Alt+↓` move between slides without touching the mouse (by @vadika, #42).
-          - **Slide divider line** — a subtle visual separator between slides in the editor (by @vadika, #41).
+          - **PDF handout export with speaker notes and N-up layouts** — export handouts with speaker notes alongside slides, or print multiple slides per page; plus standard paper size options for PDF export (by @vadika, #89).
 
           ### Bug fixes
-          - **Fixed panels hidden after relaunch when closed in focus mode** — the collapsed panel sizes were being saved and then restored on next launch, leaving the slide preview and inspector invisible until manually resized.
-          - **Fixed duplicate Windows desktop shortcuts on upgrade** — a legacy per-machine shortcut was created on top of the existing one on each install (reported by @a1880, #39).
-          - **Fixed edge-to-edge icon artwork** — icon rendering was clipped on Windows, Linux, and mobile platforms.
-          - **Fixed `|` segmented header/footer not exporting to PPTX** — the split was applied after variable resolution, so a document title containing `|` (e.g. "Costs | Benefits") was treated as a separator (reported by @a1880, #44).
-          - **Fixed white-on-white Mermaid labels** — `labelTextColor` now follows the slide body text colour.
+          - **Fixed blank PDF slides on Windows and invisible images on Linux** — Windows exports could produce extra blank pages from missing paper-size/margin settings; Linux exports dropped embedded images due to a WebKitGTK rendering quirk.
+          - **Fixed invisible Mermaid diagram labels in PDF/PPTX export** — flowchart labels lost their text colour on export (closes #45).
+          - **Fixed "file changed externally" false alarms on OneDrive-synced folders** — file-watcher metadata-only events (timestamps/xattrs touched by sync clients) were mistaken for real edits (reported by @florian-hubertSE, #91).
+          - **Fixed custom theme not applying on startup** — a race between session restore and theme loading could leave the theme unapplied until manually reselected (#90).
+          - **Fixed footer/header template variables being stripped** — custom footer/header text containing `{date}`, `{title}`, `{slide_number}`, or `{total}` was silently reverted to the theme default on reload (#55).
 
           ---
 
