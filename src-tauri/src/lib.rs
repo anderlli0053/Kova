@@ -99,7 +99,6 @@ pub fn run() {
             commands::fetch_url_text,
             commands::confirm_exit,
             commands::take_pending_open,
-            commands::check_native_pdf,
             commands::export_pdf_native,
         ])
         .build(tauri::generate_context!())
