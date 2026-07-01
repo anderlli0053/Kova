@@ -1003,8 +1003,9 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
     if (!view) return;
     const current = view.state.doc.toString();
     // `current !== content` is the fast path (equal on every keystroke); only
-    // when they differ do we pay the CRLF-normalising compare.
-    if (current !== content && current !== content.replace(/\r\n/g, '\n')) {
+    // when they differ do we pay the line-ending-normalising compare. CodeMirror
+    // collapses lone \r as well as \r\n, so both must be normalised here too.
+    if (current !== content && current !== content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')) {
       view.dispatch({ changes: { from: 0, to: current.length, insert: content } });
     }
   }, [content]);
