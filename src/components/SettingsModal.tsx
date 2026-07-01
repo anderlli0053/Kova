@@ -585,6 +585,23 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
           </div>
         </div>
 
+        <div style={{ padding: '10px 0' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>PDF page size</div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+            Paper size for PDF export. Pages are laid out landscape.
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {([
+              { value: 'a4',     label: 'A4'     },
+              { value: 'letter', label: 'Letter' },
+            ] as { value: AppSettings['pdfPageSize']; label: string }[]).map(({ value, label }) => (
+              <button key={value} type="button" onClick={() => set('pdfPageSize', value)}
+                style={groupBtnStyle(settings.pdfPageSize === value)}
+              >{label}</button>
+            ))}
+          </div>
+        </div>
+
         {/* Presentation */}
         <Section label="Presentation" />
 

@@ -38,7 +38,7 @@ objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSResponder"] }
 # Native PDF export via WKWebView.createPDFWithConfiguration:completionHandler:
 objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKPDFConfiguration"] }
-objc2-foundation = { version = "0.3", features = ["NSData", "NSError"] }
+objc2-foundation = { version = "0.3", features = ["NSData", "NSError", "NSGeometry"] }
 block2 = "0.6"
 
 [target.'cfg(target_os = "windows")'.dependencies]
@@ -51,4 +51,6 @@ windows = { version = "0.61", features = [] }
 gtk = { version = "0.18", features = [] }
 gdk = { version = "0.18", features = [] }
 gio = "0.18"
+# Native PDF export via WebKitPrintOperation. Pinned to what wry already pulls in.
+webkit2gtk = "=2.0.2"
 

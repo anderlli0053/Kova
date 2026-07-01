@@ -2,11 +2,9 @@ import { invoke } from '@tauri-apps/api/core';
 import type { AspectRatio } from '../types';
 import { mermaidSvgCache } from './mermaidSvgCache';
 import { imageMime } from './imageMime';
+import { type PdfExportOpts, planPage, SLIDE_PX_W } from './pdfLayout';
 
-// At 96 CSS DPI: 254mm = 960px exactly. Slides are rendered off-screen at 960px
-// wide, so this page size maps one-to-one with no scaling required.
-const PDF_W_MM  = 254;
-const SLIDE_PX_W = 960;
+export type { PdfExportOpts };
 
 // ── Public entry point ───────────────────────────────────────────────────────
 
@@ -14,13 +12,21 @@ export async function exportPdfNative(
   slideElements: HTMLElement[],
   aspectRatio: AspectRatio,
   savePath: string,
+  opts: PdfExportOpts = {},
 ): Promise<void> {
-  const html = await buildPrintDocument(slideElements, aspectRatio);
+  const html = await buildPrintDocument(slideElements, aspectRatio, opts);
+  const plan = planPage(aspectRatio, opts);
+  const perPage = opts.perPage ?? 1;
+  const pageCount = perPage > 1 ? Math.ceil(slideElements.length / perPage) : slideElements.length;
   await invoke('export_pdf_native', {
     htmlContent: html,
     outputPath: savePath,
-    widthMm: PDF_W_MM,
-    heightMm: pageMm(aspectRatio),
+    widthMm: plan.pageWmm,
+    heightMm: plan.pageHmm,
+    // Per-page capture rects for the macOS path (one createPDF per page, then merge).
+    pageCount,
+    pageWidthPx: plan.pageWpx,
+    pageHeightPx: plan.pageHpx,
   });
 }
 
@@ -29,9 +35,10 @@ export async function exportPdfNative(
 export async function buildPrintDocument(
   slideElements: HTMLElement[],
   aspectRatio: AspectRatio,
+  opts: PdfExportOpts = {},
 ): Promise<string> {
-  const slideH = Math.round(SLIDE_PX_W * aspectRatio.h / aspectRatio.w);
-  const H_MM   = pageMm(aspectRatio);
+  const plan = planPage(aspectRatio, opts);
+  const perPage = opts.perPage ?? 1;
 
   // Read slide background color from the live DOM before cloning.
   const slideFrame = slideElements[0]?.querySelector('.slide-frame');
@@ -50,10 +57,29 @@ export async function buildPrintDocument(
   // 2. Extract all document CSS with font URLs resolved to data URIs.
   const css = await extractAllCss();
 
-  // 3. Assemble the final HTML document.
-  const pages = clones
-    .map((el) => `<div class="kova-page">${el.outerHTML}</div>`)
-    .join('\n');
+  // Each slide is a 960×native box scaled into a frame sized to the slide's own
+  // proportions (so the N-up border hugs the slide), centred in its slot.
+  const slot = (el: HTMLElement) =>
+    `<div class="kova-slot"><div class="kova-frame"><div class="kova-scale">${el.outerHTML}</div></div></div>`;
+
+  // 3. Assemble pages — slides scaled/centred onto a standard paper page.
+  let pages: string;
+  if (plan.mode === 'nup') {
+    const sheets: HTMLElement[][] = [];
+    for (let i = 0; i < clones.length; i += perPage) sheets.push(clones.slice(i, i + perPage));
+    pages = sheets.map((sheet) =>
+      `<div class="kova-page"><div class="kova-content kova-grid">${sheet.map(slot).join('')}</div></div>`,
+    ).join('\n');
+  } else if (plan.mode === 'notes') {
+    pages = clones.map((el, i) => {
+      const note = escapeHtml((opts.notes?.[i] ?? '').trim());
+      return `<div class="kova-page"><div class="kova-content kova-col">${slot(el)}<div class="kova-notes">${note}</div></div></div>`;
+    }).join('\n');
+  } else {
+    pages = clones.map((el) =>
+      `<div class="kova-page"><div class="kova-content kova-center">${slot(el)}</div></div>`,
+    ).join('\n');
+  }
 
   const bgCss = slideBg ? `background: ${slideBg} !important;` : '';
 
@@ -64,7 +90,7 @@ export async function buildPrintDocument(
 <style>
 ${css}
 @page {
-  size: ${PDF_W_MM}mm ${H_MM}mm;
+  size: ${plan.pageWmm}mm ${plan.pageHmm}mm;
   margin: 0;
 }
 *, *::before, *::after {
@@ -91,21 +117,73 @@ html, body {
   max-height: none !important;
   overflow: visible !important;
   zoom: 1 !important;
-  ${bgCss}
 }
 .kova-page {
   display: block !important;
-  width: ${SLIDE_PX_W}px !important;
-  height: ${slideH}px !important;
+  width: ${plan.pageWpx}px !important;
+  height: ${plan.pageHpx}px !important;
   overflow: hidden !important;
   break-after: page;
   page-break-after: always;
   position: relative !important;
   margin: 0 !important;
+  background: ${slideBg || '#fff'} !important;
 }
 .kova-page:last-child {
   break-after: avoid;
   page-break-after: avoid;
+}
+.kova-content {
+  position: absolute !important;
+  inset: ${plan.marginPx}px !important;
+  box-sizing: border-box !important;
+}
+.kova-center { display: flex !important; align-items: center !important; justify-content: center !important; }
+.kova-col    { display: flex !important; flex-direction: column !important; }
+.kova-grid {
+  display: grid !important;
+  grid-template-columns: repeat(${plan.cols}, ${plan.cellWpx}px) !important;
+  grid-auto-rows: ${plan.cellHpx}px !important;
+  gap: ${plan.gapPx}px !important;
+  align-content: center !important;
+  justify-content: center !important;
+}
+.kova-slot {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+}
+.kova-grid .kova-slot { width: ${plan.cellWpx}px !important; height: ${plan.cellHpx}px !important; }
+.kova-col  .kova-slot { width: 100% !important; height: ${plan.cellHpx}px !important; flex: 0 0 auto !important; }
+.kova-center .kova-slot { width: 100% !important; height: 100% !important; }
+.kova-frame {
+  position: relative !important;
+  box-sizing: border-box !important;
+  width: ${SLIDE_PX_W * plan.slideScale}px !important;
+  height: ${plan.slideNativeHpx * plan.slideScale}px !important;
+  overflow: hidden !important;
+  flex: 0 0 auto !important;
+  ${bgCss}
+}
+.kova-grid .kova-frame { border: 1px solid #c8c8c8 !important; }
+.kova-scale {
+  width: ${SLIDE_PX_W}px !important;
+  height: ${plan.slideNativeHpx}px !important;
+  transform: scale(${plan.slideScale}) !important;
+  transform-origin: top left !important;
+}
+.kova-notes {
+  flex: 1 1 auto !important;
+  box-sizing: border-box !important;
+  margin-top: ${plan.gapPx}px !important;
+  padding: 20px 24px !important;
+  font: 18px/1.55 -apple-system, system-ui, sans-serif !important;
+  color: #111 !important;
+  background: #fff !important;
+  white-space: pre-wrap !important;
+  overflow: hidden !important;
+  border-top: 2px solid #999 !important;
 }
 </style>
 </head>
@@ -247,8 +325,8 @@ async function resolveFontUrls(css: string): Promise<string> {
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-function pageMm(ar: AspectRatio): number {
-  return Math.round((PDF_W_MM * ar.h / ar.w) * 100) / 100;
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'));
 }
 
 function blobToDataUrl(blob: Blob): Promise<string> {

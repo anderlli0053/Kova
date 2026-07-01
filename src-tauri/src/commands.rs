@@ -1162,18 +1162,6 @@ fn sort_dedup_fonts(mut fonts: Vec<String>) -> Vec<String> {
 // ── Native PDF export ────────────────────────────────────────────────────────
 
 /// Render a self-contained HTML document to a PDF file using the platform's
-/// Returns Ok if native PDF export is available on this platform; returns
-/// Err("not yet implemented") on platforms where only the JS raster fallback
-/// is used. Callers should check this before building the HTML document to
-/// avoid sending a large payload over IPC unnecessarily.
-#[tauri::command]
-pub fn check_native_pdf() -> Result<(), String> {
-    #[cfg(target_os = "linux")]
-    return Err("not yet implemented".into());
-    #[cfg(not(target_os = "linux"))]
-    Ok(())
-}
-
 /// native WebView print API (WKWebView on macOS, WebView2 on Windows).
 /// The HTML must be fully self-contained (all fonts and images embedded as
 /// data: URIs) so the hidden render window needs no network or asset:// access.
@@ -1184,6 +1172,9 @@ pub async fn export_pdf_native(
     output_path: String,
     width_mm: f64,
     height_mm: f64,
+    page_count: u32,
+    page_width_px: f64,
+    page_height_px: f64,
 ) -> Result<(), String> {
     use tauri::Manager;
 
@@ -1204,18 +1195,16 @@ pub async fn export_pdf_native(
 
     let html_path_str = html_path.to_str().ok_or("html_path is non-UTF-8")?.to_string();
 
-    // Linux: no native PDF backend — fall through to the raster path in JS.
-    #[cfg(target_os = "linux")]
+    // Load the HTML in a hidden WebviewWindow and print it with the platform's
+    // native WebView print API (WKWebView / WebView2 / WebKitGTK).
     {
-        let _ = (width_mm, height_mm, html_path_str, output_path);
-        let _ = std::fs::remove_file(&html_path);
-        return Err("not yet implemented".into());
-    }
+        // Per-page rect params are macOS-only; Windows and Linux paginate from
+        // @page using width_mm/height_mm. Silence what each target doesn't use.
+        #[cfg(not(target_os = "macos"))]
+        let _ = (page_count, page_width_px, page_height_px);
+        #[cfg(target_os = "macos")]
+        let _ = (width_mm, height_mm);
 
-    // macOS / Windows: load the HTML in a hidden WebviewWindow and use the
-    // platform's native WebView printing API.
-    #[cfg(not(target_os = "linux"))]
-    {
         // Produce a valid file:// URL.
         // On Windows: C:\foo\bar.html → file:///C:/foo/bar.html (triple slash required)
         // On Unix:    /path/bar.html  → file:///path/bar.html
@@ -1268,11 +1257,18 @@ pub async fn export_pdf_native(
         .ok();
 
         #[cfg(target_os = "macos")]
-        let result = platform_macos::generate_pdf(&window, &output_path).await;
+        let result = platform_macos::generate_pdf(
+            &window, &output_path, page_count, page_width_px, page_height_px,
+        )
+        .await;
 
         #[cfg(target_os = "windows")]
         let result =
             platform_windows::generate_pdf(&window, &output_path, width_mm, height_mm).await;
+
+        #[cfg(target_os = "linux")]
+        let result =
+            platform_linux::generate_pdf(&window, &output_path, width_mm, height_mm).await;
 
         let _ = window.destroy();
         let _ = std::fs::remove_file(&html_path);
@@ -1281,67 +1277,136 @@ pub async fn export_pdf_native(
     }
 }
 
-// ── macOS: WKWebView.createPDFWithConfiguration:completionHandler: ────────────
+// ── macOS: per-page WKWebView.createPDF + PDFKit merge (paginates the export) ──
+//
+// createPDFWithConfiguration snapshots a region as a SINGLE page, so we capture
+// one page-sized rect per logical page (slide / N-up sheet / handout) and merge
+// them into one multipage PDF with PDFKit. This stays on the async completion-
+// block path (no NSPrintOperation.runOperation, which blocks the main thread).
 
 #[cfg(target_os = "macos")]
 mod platform_macos {
     use tauri::WebviewWindow;
 
-    pub async fn generate_pdf(window: &WebviewWindow, output_path: &str) -> Result<(), String> {
+    pub async fn generate_pdf(
+        window: &WebviewWindow,
+        output_path: &str,
+        page_count: u32,
+        page_w: f64,
+        page_h: f64,
+    ) -> Result<(), String> {
+        if page_count == 0 {
+            return Err("no pages to export".into());
+        }
+        let mut pages: Vec<Vec<u8>> = Vec::with_capacity(page_count as usize);
+        for i in 0..page_count {
+            pages.push(capture_page(window, f64::from(i) * page_h, page_w, page_h).await?);
+        }
+        let merged = unsafe { merge_pdfs(&pages) }?;
+        std::fs::write(output_path, &merged).map_err(|e| format!("write PDF: {e}"))
+    }
+
+    // Capture a single page-sized rect of the web content as a one-page PDF.
+    async fn capture_page(
+        window: &WebviewWindow,
+        y: f64,
+        w: f64,
+        h: f64,
+    ) -> Result<Vec<u8>, String> {
         let (tx, rx) = std::sync::mpsc::sync_channel::<Result<Vec<u8>, String>>(1);
-        let output = output_path.to_string();
 
         window
             .with_webview(move |wv| {
                 use block2::RcBlock;
                 use objc2::{msg_send, runtime::AnyObject};
+                use objc2_foundation::{NSPoint, NSRect, NSSize};
 
-                // wv.inner() is the raw WKWebView id pointer.
                 let webview = wv.inner() as *mut AnyObject;
-
-                // Allocate a WKPDFConfiguration with default settings.
                 let config: *mut AnyObject = unsafe {
                     let cls = objc2::runtime::AnyClass::get(c"WKPDFConfiguration")
                         .expect("WKPDFConfiguration");
                     msg_send![cls, new]
                 };
+                // rect is in the web view's coordinate space (top-left origin, CSS px).
+                let rect = NSRect::new(NSPoint::new(0.0, y), NSSize::new(w, h));
+                unsafe {
+                    let _: () = msg_send![config, setRect: rect];
+                }
 
                 let tx2 = tx.clone();
-                let block =
-                    RcBlock::new(move |data: *mut AnyObject, error: *mut AnyObject| {
-                        if !error.is_null() || data.is_null() {
-                            let _ = tx2.send(Err("WKWebView PDF creation failed".into()));
-                            return;
-                        }
-                        let bytes: Vec<u8> = unsafe {
-                            let len: usize = msg_send![data, length];
-                            let ptr: *const u8 = msg_send![data, bytes];
-                            std::slice::from_raw_parts(ptr, len).to_vec()
-                        };
-                        let _ = tx2.send(Ok(bytes));
-                    });
+                let block = RcBlock::new(move |data: *mut AnyObject, error: *mut AnyObject| {
+                    if !error.is_null() || data.is_null() {
+                        let _ = tx2.send(Err("WKWebView PDF creation failed".into()));
+                        return;
+                    }
+                    let bytes: Vec<u8> = unsafe {
+                        let len: usize = msg_send![data, length];
+                        let ptr: *const u8 = msg_send![data, bytes];
+                        std::slice::from_raw_parts(ptr, len).to_vec()
+                    };
+                    let _ = tx2.send(Ok(bytes));
+                });
 
                 unsafe {
                     let _: () = msg_send![
                         webview,
-                        createPDFWithConfiguration: config
+                        createPDFWithConfiguration: config,
                         completionHandler: &*block
                     ];
-                    // config was +1 from `new`; balance it now that the call has retained it.
                     let _: () = msg_send![config, release];
                 }
             })
             .map_err(|e| format!("with_webview: {e}"))?;
 
-        let bytes = tauri::async_runtime::spawn_blocking(move || {
+        tauri::async_runtime::spawn_blocking(move || {
             rx.recv_timeout(std::time::Duration::from_secs(60))
                 .map_err(|_| "PDF generation timed out".to_string())
                 .and_then(|r| r)
         })
         .await
-        .map_err(|e| format!("{e}"))??;
+        .map_err(|e| format!("{e}"))?
+    }
 
-        std::fs::write(&output, &bytes).map_err(|e| format!("write PDF: {e}"))
+    // Merge single-page PDFs into one document via PDFKit.
+    unsafe fn merge_pdfs(pages: &[Vec<u8>]) -> Result<Vec<u8>, String> {
+        use objc2::{class, msg_send, runtime::AnyObject};
+        use objc2_foundation::NSData;
+
+        let master: *mut AnyObject = msg_send![class!(PDFDocument), new];
+        let mut idx: usize = 0;
+        for bytes in pages {
+            let data = NSData::with_bytes(bytes);
+            let doc: *mut AnyObject = msg_send![class!(PDFDocument), alloc];
+            let doc: *mut AnyObject = msg_send![doc, initWithData: &*data];
+            if doc.is_null() {
+                let _: () = msg_send![master, release];
+                return Err("PDFDocument init failed".into());
+            }
+            let n: usize = msg_send![doc, pageCount];
+            for p in 0..n {
+                let page: *mut AnyObject = msg_send![doc, pageAtIndex: p];
+                if page.is_null() {
+                    continue;
+                }
+                // Copy the page so it survives releasing its source document.
+                let page_copy: *mut AnyObject = msg_send![page, copy];
+                let _: () = msg_send![master, insertPage: page_copy, atIndex: idx];
+                let _: () = msg_send![page_copy, release];
+                idx += 1;
+            }
+            let _: () = msg_send![doc, release];
+        }
+
+        let out: *mut AnyObject = msg_send![master, dataRepresentation];
+        if out.is_null() {
+            let _: () = msg_send![master, release];
+            return Err("PDFDocument dataRepresentation returned nil".into());
+        }
+        let len: usize = msg_send![out, length];
+        let ptr: *const u8 = msg_send![out, bytes];
+        let bytes = std::slice::from_raw_parts(ptr, len).to_vec();
+        let _: () = msg_send![master, release];
+        Ok(bytes)
     }
 }
 
@@ -1447,7 +1512,82 @@ mod platform_windows {
     }
 }
 
-// ── Linux: no native PDF backend ──────────────────────────────────────────────
-//
-// The export_pdf_native command returns "not yet implemented" on Linux so
-// App.tsx falls back to the PNG raster path via jsPDF.
+// ── Linux: WebKitPrintOperation → PDF file (paginates by @page) ───────────────
+
+#[cfg(target_os = "linux")]
+mod platform_linux {
+    use tauri::WebviewWindow;
+
+    pub async fn generate_pdf(
+        window: &WebviewWindow,
+        output_path: &str,
+        width_mm: f64,
+        height_mm: f64,
+    ) -> Result<(), String> {
+        let (tx, rx) = std::sync::mpsc::sync_channel::<Result<(), String>>(1);
+        let output = output_path.to_string();
+
+        window
+            .with_webview(move |wv| {
+                use webkit2gtk::{PrintOperation, PrintOperationExt};
+
+                const MM_TO_PT: f64 = 72.0 / 25.4;
+
+                // Custom paper at the exact (already-landscape) page size, no margins.
+                let paper = gtk::PaperSize::new_custom(
+                    "kova",
+                    "Kova",
+                    width_mm * MM_TO_PT,
+                    height_mm * MM_TO_PT,
+                    gtk::Unit::Points,
+                );
+                let page_setup = gtk::PageSetup::new();
+                page_setup.set_paper_size(&paper);
+                page_setup.set_top_margin(0.0, gtk::Unit::Points);
+                page_setup.set_bottom_margin(0.0, gtk::Unit::Points);
+                page_setup.set_left_margin(0.0, gtk::Unit::Points);
+                page_setup.set_right_margin(0.0, gtk::Unit::Points);
+                page_setup.set_orientation(gtk::PageOrientation::Portrait);
+
+                // Print straight to a PDF file — no dialog. The GTK file backend's
+                // "Print to File" printer must be named explicitly, else the
+                // operation fails with "Printer not found". filename_to_uri
+                // percent-encodes spaces / non-ASCII so ordinary paths work.
+                let uri = match gtk::glib::filename_to_uri(&output, None) {
+                    Ok(u) => u,
+                    Err(e) => {
+                        let _ = tx.send(Err(format!("bad output path: {e}")));
+                        return;
+                    }
+                };
+                let settings = gtk::PrintSettings::new();
+                settings.set("printer", Some("Print to File"));
+                settings.set("output-uri", Some(uri.as_str()));
+                settings.set("output-file-format", Some("pdf"));
+
+                let op = PrintOperation::new(&wv.inner());
+                op.set_page_setup(&page_setup);
+                op.set_print_settings(&settings);
+
+                let tx_done = tx.clone();
+                op.connect_finished(move |_| {
+                    let _ = tx_done.send(Ok(()));
+                });
+                let tx_err = tx.clone();
+                op.connect_failed(move |_, err| {
+                    let _ = tx_err.send(Err(format!("WebKit print failed: {err}")));
+                });
+
+                op.print();
+            })
+            .map_err(|e| format!("with_webview: {e}"))?;
+
+        tauri::async_runtime::spawn_blocking(move || {
+            rx.recv_timeout(std::time::Duration::from_secs(60))
+                .map_err(|_| "PDF generation timed out".to_string())
+                .and_then(|r| r)
+        })
+        .await
+        .map_err(|e| format!("{e}"))?
+    }
+}

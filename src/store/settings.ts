@@ -50,6 +50,8 @@ export interface AppSettings {
   editorWordWrap: boolean;
   // Presentation defaults
   defaultThemeId: string;
+  // Export
+  pdfPageSize: 'a4' | 'letter';
   // Startup
   startupBehavior: StartupBehavior;
 }
@@ -76,6 +78,7 @@ function buildDefaults(): AppSettings {
     showFrontmatter: false,
     editorWordWrap: true,
     defaultThemeId: 'light',
+    pdfPageSize: 'a4',
     // Preserves existing behaviour (always launch blank) for anyone upgrading
     // — this only changes anything for users who explicitly opt in.
     startupBehavior: 'blank',

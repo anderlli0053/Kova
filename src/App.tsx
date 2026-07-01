@@ -36,7 +36,7 @@ import { fetchUpdate } from './engine/updater';
 import { normalizePath } from './engine/resolvePath';
 import { exportToPptx } from './engine/export/exportPptx';
 import { exportToPdf, printPresentation } from './engine/export/exportPdf';
-import { exportPdfNative, buildPrintDocument } from './engine/export/exportPdfNative';
+import { exportPdfNative, buildPrintDocument, type PdfExportOpts } from './engine/export/exportPdfNative';
 import { SlideRenderer } from './components/preview/SlideRenderer';
 import { BUILT_IN_THEMES, DEFAULT_THEME, parseThemeYaml, sanitiseThemeOverrides, type ThemeParseResult } from './engine/theme';
 import { registerBundledFonts, registerCachedFont } from './engine/bundledFonts';
@@ -141,6 +141,9 @@ export default function App() {
   const [warnMessage, setWarnMessage]     = useState<string | null>(null);
   const warnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showExternalChangeDialog, setShowExternalChangeDialog] = useState(false);
+  const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
+  const [pdfPerPage, setPdfPerPage]         = useState(1);
+  const [pdfNotesOn, setPdfNotesOn]         = useState(false);
   const [isRenaming, setIsRenaming]       = useState(false);
   const [renameValue, setRenameValue]     = useState('');
   const [resolvedUiTheme, setResolvedUiTheme] = useState<'dark' | 'light'>('dark');
@@ -1199,7 +1202,7 @@ export default function App() {
     }
   });
 
-  const handleExportPdf = useCallback(async () => {
+  const handleExportPdf = useCallback(async (opts: PdfExportOpts = {}) => {
     if (visibleSlides.length === 0) return;
     const defaultPath = filePath
       ? filePath.replace(/\.(md|markdown)$/i, '.pdf')
@@ -1210,12 +1213,6 @@ export default function App() {
     });
     if (!target) return;
     const savePath = target.toLowerCase().endsWith('.pdf') ? target : `${target}.pdf`;
-    // Determine native vs raster BEFORE mounting off-screen slides so the runner
-    // body contains no intermediate async IPC calls between element capture and
-    // exportToPdf — any await between the two gives React a chance to flush a
-    // pending update and unmount the slides, producing 0-width elements.
-    let useNative = false;
-    try { await invoke('check_native_pdf'); useNative = true; } catch { /* Linux or not supported */ }
 
     const visSlides = [...visibleSlides];
     pdfSlideRefs.current.clear();
@@ -1229,14 +1226,18 @@ export default function App() {
             (_, i) => pdfSlideRefs.current.get(i),
           ).filter((el): el is HTMLElement => Boolean(el));
 
-          if (useNative) {
-            await exportPdfNative(elements, aspectRatio, savePath);
-          } else {
+          try {
+            await exportPdfNative(elements, aspectRatio, savePath, opts);
+          } catch (nativeErr) {
+            // Native backend unavailable/failed — degrade to the raster renderer.
+            // It's one-slide-per-page and ignores handout/N-up/paper options.
+            console.error('Native PDF failed, falling back to raster:', nativeErr);
             const { base64, warnings } = await exportToPdf(elements, activeTheme, aspectRatio);
             await invoke('write_file_bytes', { path: savePath, data: base64 });
-            if (warnings.length > 0) {
-              window.alert(`PDF export complete with ${warnings.length} warning(s):\n\n${warnings.join('\n')}`);
-            }
+            window.alert(
+              `Used the basic PDF renderer (native export unavailable); handout/N-up/paper options were not applied.` +
+              (warnings.length ? `\n\n${warnings.join('\n')}` : ''),
+            );
           }
         } catch (err) {
           console.error('PDF export failed:', err);
@@ -1275,7 +1276,7 @@ export default function App() {
             (_, i) => pdfSlideRefs.current.get(i),
           ).filter((el): el is HTMLElement => Boolean(el));
 
-          const html = await buildPrintDocument(elements, aspectRatio);
+          const html = await buildPrintDocument(elements, aspectRatio, { fullBleed: true });
           await invoke('write_file', { path: savePath, content: html });
         } catch (err) {
           console.error('HTML export failed:', err);
@@ -1460,7 +1461,7 @@ export default function App() {
     importUrl: () => guardDirty(() => setShowImportUrl(true)),
     importMarp: handleImportMarp,
     export: handleExport,
-    exportPdf: handleExportPdf,
+    exportPdf: () => { setPdfPerPage(1); setPdfNotesOn(false); setPdfOptionsOpen(true); },
     exportHtml: handleExportHtml,
     print: handlePrint,
     present: () => { void handlePresentEnter(); },
@@ -1660,7 +1661,7 @@ export default function App() {
               <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExport(); }}>
                 Export PowerPoint (.pptx)
               </button>
-              <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExportPdf(); }}>
+              <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); setPdfPerPage(1); setPdfNotesOn(false); setPdfOptionsOpen(true); }}>
                 {pdfExportContext ? 'Exporting PDF…' : 'Export PDF (.pdf)'}
               </button>
               <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExportHtml(); }}>
@@ -2012,6 +2013,59 @@ export default function App() {
                   OK
                 </button>
               )}
+            </div>
+          </div>
+        </>
+      )}
+
+      {pdfOptionsOpen && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'var(--backdrop)', zIndex: 2000 }} onClick={() => setPdfOptionsOpen(false)} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8,
+            boxShadow: '0 16px 48px rgba(0,0,0,0.6)', zIndex: 2001,
+            padding: '24px 28px', width: 360, maxWidth: '90vw',
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
+              Export PDF
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-label)', marginBottom: 8 }}>Slides per page</div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+              {[1, 2, 4, 6].map((n) => (
+                <button
+                  key={n}
+                  className={pdfPerPage === n ? 'btn btn-primary' : 'btn'}
+                  style={{ flex: 1 }}
+                  onClick={() => { setPdfPerPage(n); if (n !== 1) setPdfNotesOn(false); }}
+                >{n}</button>
+              ))}
+            </div>
+            {(() => {
+              const hasNotes = visibleSlides.some((s) => s.speakerNotes.trim());
+              const notesOk = pdfPerPage === 1 && hasNotes;
+              return (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: notesOk ? 'var(--text-primary)' : 'var(--text-secondary)', opacity: notesOk ? 1 : 0.5, marginBottom: 20 }}>
+                  <input
+                    type="checkbox"
+                    checked={notesOk && pdfNotesOn}
+                    disabled={!notesOk}
+                    onChange={(e) => setPdfNotesOn(e.target.checked)}
+                  />
+                  Include speaker notes (handout){pdfPerPage === 1 && !hasNotes ? ' — none in this deck' : ''}
+                </label>
+              );
+            })()}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button className="btn" onClick={() => setPdfOptionsOpen(false)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setPdfOptionsOpen(false);
+                  const notes = pdfPerPage === 1 && pdfNotesOn ? visibleSlides.map((s) => s.speakerNotes) : undefined;
+                  void handleExportPdf({ perPage: pdfPerPage, notes, paper: settings.pdfPageSize });
+                }}
+              >Export</button>
             </div>
           </div>
         </>
