@@ -97,4 +97,143 @@ describe('parser → layout integration', () => {
     const list = slides[0].elements.find((e) => e.type === 'list');
     expect(list?.type === 'list' && list.items).toHaveLength(12);
   });
+
+  it('H1 hero slide with no body → layout: title', () => {
+    const { slides } = parseDocument(doc('# Hero\n'));
+    expect(slides[0].layout).toBe('title');
+    expect(slides[0].title).toBe('Hero');
+    expect(slides[0].titleLevel).toBe(1);
+  });
+
+  it('title + image only → layout: title-image', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      '![](assets/hero.jpg)',
+    ].join('\n')));
+    expect(slides[0].layout).toBe('title-image');
+    expect(slides[0].elements.filter((e) => e.type === 'image')).toHaveLength(1);
+  });
+
+  it('title + text + image without blank line → layout: split', () => {
+    const { slides } = parseDocument(doc('## Slide\n\nBody copy\n![](assets/photo.jpg)\n'));
+    expect(slides[0].layout).toBe('split');
+    expect(slides[0].elements.some((e) => e.type === 'paragraph')).toBe(true);
+    expect(slides[0].elements.some((e) => e.type === 'image')).toBe(true);
+  });
+
+  it('mermaid-only slide → layout: code', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      '```mermaid',
+      'pie title Stats',
+      '    "A": 1',
+      '```',
+    ].join('\n')));
+    expect(slides[0].layout).toBe('code');
+    expect(slides[0].elements.find((e) => e.type === 'mermaid')).toBeTruthy();
+  });
+
+  it('mermaid + bullet list → layout: bsp', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      '```mermaid',
+      'pie title Stats',
+      '    "A": 1',
+      '```',
+      '',
+      '- Takeaway',
+    ].join('\n')));
+    expect(slides[0].layout).toBe('bsp');
+    expect(slides[0].elements.some((e) => e.type === 'mermaid')).toBe(true);
+    expect(slides[0].elements.some((e) => e.type === 'list')).toBe(true);
+  });
+
+  it('paragraph + list + code + mermaid → layout: grid', () => {
+    const { slides } = parseDocument(doc([
+      '## Slide',
+      '',
+      'Overview paragraph.',
+      '',
+      '- Item one',
+      '',
+      '```js',
+      'const x = 1',
+      '```',
+      '',
+      '```mermaid',
+      'pie title Stats',
+      '    "A": 1',
+      '```',
+    ].join('\n')));
+    expect(slides[0].layout).toBe('grid');
+    expect(slides[0].elements.some((e) => e.type === 'paragraph')).toBe(true);
+    expect(slides[0].elements.some((e) => e.type === 'list')).toBe(true);
+    expect(slides[0].elements.some((e) => e.type === 'code')).toBe(true);
+    expect(slides[0].elements.some((e) => e.type === 'mermaid')).toBe(true);
+  });
+
+  it('blockquote only with no heading → layout: quote', () => {
+    const { slides } = parseDocument(doc('> A standalone quote.\n'));
+    expect(slides[0].layout).toBe('quote');
+    expect(slides[0].title).toBe('');
+    expect(slides[0].elements.find((e) => e.type === 'blockquote')).toBeTruthy();
+  });
+
+  it('empty slide body with no heading → layout: blank', () => {
+    const { slides } = parseDocument(doc('???\n\nPresenter notes only\n'));
+    expect(slides[0].layout).toBe('blank');
+    expect(slides[0].title).toBe('');
+    expect(slides[0].elements).toHaveLength(0);
+    expect(slides[0].speakerNotes).toContain('Presenter notes only');
+  });
+});
+
+describe('parser → layout integration (multi-slide deck)', () => {
+  it('assigns the correct layout to each slide of a realistic deck', () => {
+    const md = [
+      '---',
+      'title: Realistic Deck',
+      '---',
+      '',
+      '# Title slide',
+      '',
+      '---',
+      '',
+      '## Section',
+      '',
+      '---',
+      '',
+      '## Content',
+      '',
+      'Some body text',
+      '',
+      '---',
+      '',
+      '## Code',
+      '',
+      '```js',
+      'const x = 1',
+      '```',
+      '',
+      '---',
+      '',
+      '![](img.png)',
+    ].join('\n');
+    const { slides } = parseDocument(md);
+    expect(slides).toHaveLength(5);
+    expect(slides.map((s) => s.layout)).toEqual([
+      'title',
+      'section',
+      'title-content',
+      'code',
+      'full-bleed',
+    ]);
+    expect(slides[0].title).toBe('Title slide');
+    expect(slides[1].title).toBe('Section');
+    expect(slides[4].title).toBe('');
+    expect(slides[4].elements.find((e) => e.type === 'image')).toBeTruthy();
+  });
 });

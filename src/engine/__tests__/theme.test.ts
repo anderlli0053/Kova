@@ -64,6 +64,15 @@ describe('themeToVars', () => {
     expect(horizonVars['--sl-deco-img']).toContain('var(--sl-accent)');
   });
 
+  it('decoration:diagonal produces a 45deg repeating-linear-gradient', () => {
+    const result = parseThemeYaml('diag', 'name: Diag\nlayout:\n  decoration: diagonal\n');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const diagVars = themeToVars(result.theme) as Record<string, string>;
+    expect(diagVars['--sl-deco-img']).toContain('repeating-linear-gradient(45deg');
+    expect(diagVars['--sl-deco-size']).toBe('24px 24px');
+  });
+
   it('bottom-left title align sets flex-end justify', () => {
     const pitchTheme = BUILT_IN_THEMES.find((t) => t.id === 'pitch')!;
     const pitchVars = themeToVars(pitchTheme) as Record<string, string>;
@@ -319,6 +328,28 @@ footer:
     if (!result.ok) return;
     expect(result.theme.layout.decoration).toBe('dots');
     expect(result.theme.layout.title_align).toBe('left');
+  });
+
+  it('parses bundledFonts list', () => {
+    const result = parseThemeYaml('fonts-theme', 'name: Fonts\nbundledFonts:\n  - Montserrat\n');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.theme.bundledFonts).toEqual(['Montserrat']);
+  });
+
+  it('filters non-string entries out of bundledFonts', () => {
+    const result = parseThemeYaml('fonts-theme', 'name: Fonts\nbundledFonts:\n  - Montserrat\n  - 42\n');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.theme.bundledFonts).toEqual(['Montserrat']);
+  });
+
+  it('round-trips a chart_colors array through YAML parse', () => {
+    const yaml = 'name: Chart\ncolors:\n  chart_colors:\n    - "#FF0000"\n    - "#00FF00"\n    - "#0000FF"\n';
+    const result = parseThemeYaml('chart-theme', yaml);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.theme.colors.chart_colors).toEqual(['#FF0000', '#00FF00', '#0000FF']);
   });
 });
 

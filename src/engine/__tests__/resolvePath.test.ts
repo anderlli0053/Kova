@@ -34,4 +34,23 @@ describe('normalizePath', () => {
     expect(normalizePath('/docs//talks', 'sub//y.png')).toBe('/docs/talks/sub/y.png');
     expect(normalizePath('C:\\docs\\\\talks', 'sub//y.png')).toBe('C:\\docs\\talks\\sub\\y.png');
   });
+
+  it('treats a leading slash on the relative path as a separator, not a new root', () => {
+    expect(normalizePath('/docs/talks', '/abs/img.png')).toBe('/docs/talks/abs/img.png');
+  });
+
+  it('collapses interleaved ./ and ../ segments within the relative path', () => {
+    expect(normalizePath('/docs/talks', './sub/../img.png')).toBe('/docs/talks/img.png');
+    expect(normalizePath('/docs/talks', 'a/./b/../../c.png')).toBe('/docs/talks/c.png');
+  });
+
+  it('keeps forward slashes when a Windows drive docDir uses them', () => {
+    expect(normalizePath('C:/docs/talks', './sub/../img.png')).toBe('C:/docs/talks/img.png');
+    expect(normalizePath('C:/docs/talks', '../img/x.png')).toBe('C:/docs/img/x.png');
+  });
+
+  it('preserves spaces and URL-encoded characters inside path segments', () => {
+    expect(normalizePath('/docs/talks', 'my img.png')).toBe('/docs/talks/my img.png');
+    expect(normalizePath('/docs/talks', 'a%20b/../x.png')).toBe('/docs/talks/x.png');
+  });
 });
