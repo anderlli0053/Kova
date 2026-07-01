@@ -30,13 +30,18 @@ jobs:
 
           ### New features
           - **PDF handout export with speaker notes and N-up layouts** — export handouts with speaker notes alongside slides, or print multiple slides per page; plus standard paper size options for PDF export (by @vadika, #89).
+          - **Table of Contents slide discoverability** — the Insert menu now adds an Agenda slide with `!toc` (by @Ayush7614, #104).
+          - **Export menu grouped under a submenu** — File menu export items (PDF, PPTX, HTML) now live under a single Export submenu, mirroring the existing Import submenu.
+          - **Local video now inlines into standalone HTML export** — `!video[label](path)` sources are embedded as base64 data URIs, so exported HTML plays video outside the app instead of a dead `asset://` link.
 
           ### Bug fixes
+          - **Fixed unedited CRLF files showing as changed on open** — opening a Windows-line-ending file immediately marked it dirty and prompted to save on exit, even with no edits (reported by @a1880, #95).
           - **Fixed blank PDF slides on Windows and invisible images on Linux** — Windows exports could produce extra blank pages from missing paper-size/margin settings; Linux exports dropped embedded images due to a WebKitGTK rendering quirk.
           - **Fixed invisible Mermaid diagram labels in PDF/PPTX export** — flowchart labels lost their text colour on export (reported by @a1880, #45).
           - **Fixed "file changed externally" false alarms on OneDrive-synced folders** — file-watcher metadata-only events (timestamps/xattrs touched by sync clients) were mistaken for real edits (reported and fixed by @florian-hubertSE, #91).
           - **Fixed custom theme not applying on startup** — a race between session restore and theme loading could leave the theme unapplied until manually reselected (reported by @MasterPlay007, #90).
-          - **Fixed footer/header template variables being stripped** — custom footer/header text containing `{date}`, `{title}`, `{slide_number}`, or `{total}` was silently reverted to the theme default on reload (reported by @a1880, #55).
+          - **Fixed footer/header customisations reverting on reload** — template variables like `{date}`, `{title}`, `{slide_number}`, `{total}` were stripped as invalid, and Branding-panel edits were dropped entirely when the theme had no explicit `theme:` key set (reported by @a1880, #55).
+          - **Fixed local video embeds being silently broken** — an unrelated PDF export fix had accidentally reverted the `!video` feature; it's restored.
 
           ---
 
