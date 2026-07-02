@@ -182,6 +182,18 @@ describe('parser → layout integration', () => {
     expect(slides[0].elements.find((e) => e.type === 'blockquote')).toBeTruthy();
   });
 
+  it('quote-layout blockquote with a list still gets structured html (#116)', () => {
+    const { slides } = parseDocument(doc('> Intro\n> - first\n> - second\n'));
+    expect(slides[0].layout).toBe('quote');
+    const bq = slides[0].elements.find((e) => e.type === 'blockquote');
+    const html = bq?.type === 'blockquote' ? bq.html ?? '' : '';
+    expect(html).toContain('<li>first</li>');
+    expect(html).toContain('<li>second</li>');
+    // QuoteLayout must render `html`, not the flattened `text`, or list
+    // markers/breaks are lost again even though the parser preserved them.
+    expect(bq?.type === 'blockquote' && bq.text).toBe('Introfirstsecond');
+  });
+
   it('empty slide body with no heading → layout: blank', () => {
     const { slides } = parseDocument(doc('???\n\nPresenter notes only\n'));
     expect(slides[0].layout).toBe('blank');

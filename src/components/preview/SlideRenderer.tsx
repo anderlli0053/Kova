@@ -456,7 +456,9 @@ function QuoteLayout({ slide }: { slide: Slide }) {
       {bq && bq.type === 'blockquote' && (
         <>
           <div className="sl-quote__mark">"</div>
-          <div className="sl-quote__text">{bq.text}</div>
+          {bq.html
+            ? <div className="sl-quote__text" dangerouslySetInnerHTML={{ __html: bq.html }} />
+            : <div className="sl-quote__text">{bq.text}</div>}
           {bq.attribution && (
             <div className="sl-quote__attr">— {bq.attribution}</div>
           )}

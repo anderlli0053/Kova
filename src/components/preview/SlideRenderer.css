@@ -335,6 +335,11 @@
   line-height: 1.5;
   max-width: 80%;
 }
+.sl-quote__text p { margin: 0 0 0.3em; }
+.sl-quote__text p:last-child { margin-bottom: 0; }
+.sl-quote__text ul, .sl-quote__text ol { margin: 0.2em 0; padding-left: 1.4em; text-align: left; }
+.sl-quote__text ul { list-style: disc; }
+.sl-quote__text ol { list-style: decimal; }
 .sl-quote__attr {
   margin-top: 1em;
   font-size: clamp(8px, 1.8cqi, 15px);
