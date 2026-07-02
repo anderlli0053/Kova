@@ -168,6 +168,23 @@ describe('element parsing', () => {
     expect(bq?.type === 'blockquote' && bq.attribution).toBe('The Author');
   });
 
+  it('preserves list structure inside a blockquote (#116)', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n> Intro\n> - first\n> - second\n'));
+    const bq = slides[0].elements.find((e) => e.type === 'blockquote');
+    const html = bq?.type === 'blockquote' ? bq.html ?? '' : '';
+    expect(html).toContain('<p>Intro</p>');
+    expect(html).toContain('<li>first</li>');
+    expect(html).toContain('<li>second</li>');
+    expect(html).not.toContain('firstsecond'); // no run-on flattening
+  });
+
+  it('keeps inline formatting in an attributed blockquote (#116)', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n> A **bold** point\n> — The Author\n'));
+    const bq = slides[0].elements.find((e) => e.type === 'blockquote');
+    expect(bq?.type === 'blockquote' && bq.attribution).toBe('The Author');
+    expect(bq?.type === 'blockquote' && bq.html).toContain('<strong>bold</strong>');
+  });
+
   it('parses GFM table', () => {
     const { slides } = parseDocument(doc('## Slide\n\n| A | B |\n|---|---|\n| 1 | 2 |\n'));
     const table = slides[0].elements.find((e) => e.type === 'table');
