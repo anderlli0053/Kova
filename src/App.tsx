@@ -1396,6 +1396,39 @@ export default function App() {
     setTimeout(() => editorRef.current?.scrollToSlide(toIndex), 50);
   }, []);
 
+  const handleDuplicateSlide = useCallback((index: number) => {
+    setContent((prev) => {
+      const fmMatch = prev.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+      const fmBlock = fmMatch ? fmMatch[0] : '';
+      const body = prev.slice(fmBlock.length);
+      const segments = body.split(/^---$/m);
+      if (index < 0 || index >= segments.length) return prev;
+      const next = [...segments];
+      next.splice(index + 1, 0, segments[index]);
+      return fmBlock + next.map((s) => s.trim()).join('\n\n---\n\n') + '\n';
+    });
+    setIsDirty(true);
+    setCurrentSlideIndex(index + 1);
+    setTimeout(() => editorRef.current?.scrollToSlide(index + 1), 50);
+  }, []);
+
+  const handleDeleteSlide = useCallback((index: number) => {
+    setContent((prev) => {
+      const fmMatch = prev.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
+      const fmBlock = fmMatch ? fmMatch[0] : '';
+      const body = prev.slice(fmBlock.length);
+      const segments = body.split(/^---$/m);
+      if (index < 0 || index >= segments.length || segments.length <= 1) return prev;
+      const next = [...segments];
+      next.splice(index, 1);
+      return fmBlock + next.map((s) => s.trim()).join('\n\n---\n\n') + '\n';
+    });
+    setIsDirty(true);
+    const newIndex = Math.max(0, Math.min(index, slides.length - 2));
+    setCurrentSlideIndex(newIndex);
+    setTimeout(() => editorRef.current?.scrollToSlide(newIndex), 50);
+  }, [slides.length]);
+
   const handleToggleHidden = useCallback((index: number) => {
     setContent((prev) => {
       const fmMatch = prev.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n/);
@@ -1847,7 +1880,9 @@ export default function App() {
               currentIndex={safeSlideIndex}
               onSelect={handleThumbnailSelect}
               onReorder={handleSlideReorder}
+              onDuplicate={handleDuplicateSlide}
               onToggleHidden={handleToggleHidden}
+              onDelete={handleDeleteSlide}
               theme={activeTheme}
               docTitle={frontmatter.title}
               docDate={frontmatter.date as string | undefined}
