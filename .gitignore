@@ -33,3 +33,4 @@ npm-debug.log*
 # Local testing / QA artefacts (not for source control)
 TESTING_PLAN.md
 testing/
+test-export.md
