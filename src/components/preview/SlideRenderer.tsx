@@ -685,7 +685,9 @@ function ElementNode({ el }: { el: SlideElement }) {
     case 'blockquote':
       return (
         <blockquote className="sl-blockquote">
-          <p>{el.text}</p>
+          {el.html
+            ? <div dangerouslySetInnerHTML={{ __html: el.html }} />
+            : <p>{el.text}</p>}
           {el.attribution && <cite>— {el.attribution}</cite>}
         </blockquote>
       );

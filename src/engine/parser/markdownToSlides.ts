@@ -234,15 +234,13 @@ function convertRoot(tree: Root, placeholders: Map<number, SlideElement>): Conve
 
       case 'blockquote': {
         const bq = node as Blockquote;
-        const text = toString(bq);
-        const lines = text.split('\n').filter(Boolean);
-        const lastLine = lines[lines.length - 1] ?? '';
-        const hasAttrib = lines.length > 1 && /^[—–\-]/.test(lastLine);
-        elements.push({
-          type: 'blockquote',
-          text: hasAttrib ? lines.slice(0, -1).join('\n') : text,
-          attribution: hasAttrib ? lastLine.replace(/^[—–\-]\s*/, '') : undefined,
-        });
+        // Attribution (— Author on the last line) applies to a single-paragraph
+        // quote; the body keeps its inline formatting via `html`. Structured
+        // quotes (lists, multiple blocks) render their markup through `html` too.
+        const attrib = extractAttribution(bq);
+        elements.push(attrib
+          ? { type: 'blockquote', text: attrib.children.map((c) => toString(c)).join(''), attribution: attrib.attribution, html: `<p>${inlineToHtml(attrib.children)}</p>` }
+          : { type: 'blockquote', text: toString(bq), html: blockquoteInnerHtml(bq) });
         break;
       }
 
@@ -336,6 +334,43 @@ function convertListItem(item: MdastListItem): ListItem {
     html,
     children: subList ? subList.children.map(convertListItem) : [],
   };
+}
+
+// Blockquote children → HTML, preserving paragraphs and (nested) lists.
+// Code/tables inside a quote are rare — fall back to their flattened text.
+function blockquoteInnerHtml(bq: Blockquote): string {
+  return bq.children.map((child) => {
+    if (child.type === 'paragraph') return `<p>${inlineToHtml((child as Paragraph).children)}</p>`;
+    if (child.type === 'list') return listToHtml(child as List);
+    return `<p>${escHtml(toString(child))}</p>`;
+  }).join('');
+}
+
+// A single-paragraph quote ending in a "— Author" line: split the attribution
+// off the last text node, keeping the body's inline nodes intact for formatting.
+function extractAttribution(bq: Blockquote): { children: Node[]; attribution: string } | null {
+  if (bq.children.length !== 1 || bq.children[0].type !== 'paragraph') return null;
+  const kids = [...(bq.children[0] as Paragraph).children] as any[];
+  const last = kids[kids.length - 1];
+  if (!last || last.type !== 'text') return null;
+  const nl = (last.value as string).lastIndexOf('\n');
+  if (nl < 0) return null;
+  const tail = (last.value as string).slice(nl + 1);
+  if (!/^\s*[—–\-]/.test(tail)) return null;
+  const children = [...kids.slice(0, -1), { ...last, value: (last.value as string).slice(0, nl) }] as Node[];
+  return { children, attribution: tail.replace(/^\s*[—–\-]\s*/, '') };
+}
+
+function listToHtml(l: List): string {
+  const tag = l.ordered ? 'ol' : 'ul';
+  const items = l.children.map((item) => {
+    const mi = item as MdastListItem;
+    const sub = mi.children.find((c): c is List => c.type === 'list');
+    const inner = (mi.children.filter((c) => c.type === 'paragraph') as Paragraph[])
+      .map((p) => inlineToHtml(p.children)).join(' ');
+    return `<li>${inner}${sub ? listToHtml(sub) : ''}</li>`;
+  }).join('');
+  return `<${tag}>${items}</${tag}>`;
 }
 
 // ── Inline node → HTML ───────────────────────────────────────────────────────
