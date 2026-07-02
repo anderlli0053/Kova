@@ -4,6 +4,7 @@ Kova turns plain Markdown into polished slides — with live preview, multiple l
 
 [![Latest release](https://img.shields.io/github/v/release/KovaMD/Kova?label=release&color=orange)](https://github.com/KovaMD/Kova/releases/latest)
 [![Service status](https://status.kova.md/api/badge/1/status?style=flat&label=services)](https://status.kova.md/status/infra)
+[![Matrix](https://img.shields.io/matrix/kova-md%3Amatrix.org?server_fqdn=matrix.org&label=matrix&color=blue)](https://matrix.to/#/#kova-md:matrix.org)
 
 ## Features
 
