@@ -9,6 +9,7 @@ interface Props {
   currentIndex: number;
   onSelect: (index: number) => void;
   onReorder?: (fromIndex: number, toIndex: number) => void;
+  onDuplicate?: (index: number) => void;
   onToggleHidden?: (index: number) => void;
   theme?: Theme;
   docTitle?: string;
@@ -19,7 +20,7 @@ interface Props {
 const SLIDE_W = 960;
 const THUMB_W = 140;
 
-export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onToggleHidden, theme = DEFAULT_THEME, docTitle, docDate, aspectRatio = { w: 16, h: 9 } }: Props) {
+export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onDuplicate, onToggleHidden, theme = DEFAULT_THEME, docTitle, docDate, aspectRatio = { w: 16, h: 9 } }: Props) {
   const slideH = Math.round(SLIDE_W * aspectRatio.h / aspectRatio.w);
 
   // Observe the outer panel div (no overflow) so a scrollbar appearing in the
@@ -256,6 +257,11 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onTo
             label="Move down"
             disabled={!onReorder || menu.index === slides.length - 1}
             onClick={() => { onReorder?.(menu.index, menu.index + 1); setMenu(null); }}
+          />
+          <MenuItem
+            label="Duplicate slide"
+            disabled={!onDuplicate}
+            onClick={() => { onDuplicate?.(menu.index); setMenu(null); }}
           />
           <MenuItem
             label={slides[menu.index]?.hidden ? 'Show slide' : 'Hide slide'}
