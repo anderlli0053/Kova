@@ -11,6 +11,7 @@ interface Props {
   onReorder?: (fromIndex: number, toIndex: number) => void;
   onDuplicate?: (index: number) => void;
   onToggleHidden?: (index: number) => void;
+  onDelete?: (index: number) => void;
   theme?: Theme;
   docTitle?: string;
   docDate?: string;
@@ -20,7 +21,7 @@ interface Props {
 const SLIDE_W = 960;
 const THUMB_W = 140;
 
-export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onDuplicate, onToggleHidden, theme = DEFAULT_THEME, docTitle, docDate, aspectRatio = { w: 16, h: 9 } }: Props) {
+export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onDuplicate, onToggleHidden, onDelete, theme = DEFAULT_THEME, docTitle, docDate, aspectRatio = { w: 16, h: 9 } }: Props) {
   const slideH = Math.round(SLIDE_W * aspectRatio.h / aspectRatio.w);
 
   // Observe the outer panel div (no overflow) so a scrollbar appearing in the
@@ -268,6 +269,12 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onDu
             disabled={!onToggleHidden}
             onClick={() => { onToggleHidden?.(menu.index); setMenu(null); }}
           />
+          <div role="separator" style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+          <MenuItem
+            label="Delete slide"
+            disabled={!onDelete || slides.length <= 1}
+            onClick={() => { onDelete?.(menu.index); setMenu(null); }}
+          />
         </div>
       )}
     </div>
@@ -286,7 +293,7 @@ function MenuItem({ label, disabled, onClick }: { label: string; disabled?: bool
         background: 'transparent', color: 'var(--text)', cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
       }}
-      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--accent)'; }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--bg-hover)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
     >
       {label}
