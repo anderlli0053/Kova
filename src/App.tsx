@@ -847,7 +847,16 @@ export default function App() {
     const unlistenWheel = listen<{ deltaY: number }>('audience:wheel', (e) => {
       window.dispatchEvent(new WheelEvent('wheel', { deltaY: e.payload.deltaY, bubbles: true, cancelable: true }));
     });
-    return () => { unlisten.then((fn) => fn()); unlistenWheel.then((fn) => fn()); };
+    // Table-of-contents clicks on the audience-facing screen — the audience
+    // window has already resolved the ToC entry to a visible-slide index.
+    const unlistenNavigate = listen<{ index: number }>('audience:navigate', (e) => {
+      setPresentIndex(e.payload.index);
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+      unlistenWheel.then((fn) => fn());
+      unlistenNavigate.then((fn) => fn());
+    };
   }, [presentMode, presenterMode]);
 
   // Mirror mode: keep the audience window in sync with the presenter's slide.

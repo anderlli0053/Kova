@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { emit, emitTo, listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -92,6 +92,14 @@ export function AudienceApp() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initData?.theme.remoteFonts]);
 
+  // Table-of-contents click on the audience-facing screen — resolve the real
+  // slide index to a visible-slide index (mirrors PresentationOverlay's own
+  // handleNavigateTo) and forward it to the main window, which owns navigation.
+  const handleNavigateTo = useCallback((slideIndex: number) => {
+    const visibleIdx = slidesRef.current.findIndex((s) => s.index === slideIndex);
+    if (visibleIdx >= 0) emitTo('main', 'audience:navigate', { index: visibleIdx }).catch(() => {});
+  }, []);
+
   // Forward keyboard events to the main presenter window so navigation works
   // even when the compositor gave OS focus to the audience window instead.
   useEffect(() => {
@@ -167,6 +175,7 @@ export function AudienceApp() {
                   totalSlides={total}
                   docTitle={docTitle}
                   docDate={docDate}
+                  onNavigateTo={handleNavigateTo}
                 />
               </ScaledSlideBox>
               <div

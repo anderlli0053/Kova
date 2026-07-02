@@ -58,6 +58,10 @@ function estimateLines(elements: SlideElement[]): number {
       case 'list':
         total += el.items.reduce((n, item) => n + estimateItemLines(item), 0);
         break;
+      case 'toc':
+        // ~70 chars/line, same column width assumption as list items.
+        total += el.entries.reduce((n, entry) => n + Math.max(1, Math.ceil(visualLength(entry.title) / 70)), 0);
+        break;
       case 'paragraph': {
         // ~90 chars/line: proportional body font at 18px across ~826px usable width
         const lines = el.text.split('\n').filter(Boolean);
@@ -142,7 +146,7 @@ export function detectLayout(
   // to benefit from side-by-side rendering. Skip if everything is plain
   // paragraph/list (stacked looks better for all-text slides).
 
-  const allPureText = bodyElements.every((e) => e.type === 'paragraph' || e.type === 'list' || e.type === 'blockquote');
+  const allPureText = bodyElements.every((e) => e.type === 'paragraph' || e.type === 'list' || e.type === 'blockquote' || e.type === 'toc');
   // Tables need a full-width area; bsp panes are too narrow for them.
   const hasTable = bodyElements.some((e) => e.type === 'table');
 
@@ -162,7 +166,8 @@ export function detectLayout(
   // A single paragraph cannot be split — it stays full-width regardless of length.
   const canSplitIntoColumns =
     bodyElements.length > 1 ||
-    (bodyElements.length === 1 && bodyElements[0].type === 'list' && bodyElements[0].items.length > 1);
+    (bodyElements.length === 1 && bodyElements[0].type === 'list' && bodyElements[0].items.length > 1) ||
+    (bodyElements.length === 1 && bodyElements[0].type === 'toc' && bodyElements[0].entries.length > 1);
 
   if (allPureText && canSplitIntoColumns && estimateLines(bodyElements) > OVERFLOW_LINE_THRESHOLD) {
     return 'two-column';

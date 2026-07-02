@@ -485,6 +485,22 @@ function autoSplitElements(elements: SlideElement[]): [SlideElement[], SlideElem
       [{ ...list, items: items.slice(mid) }],
     ];
   }
+  // Single toc: split entries by cumulative title length for visual balance
+  if (elements.length === 1 && elements[0].type === 'toc') {
+    const toc = elements[0];
+    const entries = toc.entries;
+    const totalLen = entries.reduce((n, en) => n + en.title.length, 0);
+    let cumLen = 0;
+    let mid = Math.ceil(entries.length / 2); // fallback for empty/equal entries
+    for (let i = 0; i < entries.length; i++) {
+      cumLen += entries[i].title.length;
+      if (cumLen >= totalLen / 2) { mid = i + 1; break; }
+    }
+    return [
+      [{ ...toc, entries: entries.slice(0, mid) }],
+      [{ ...toc, entries: entries.slice(mid) }],
+    ];
+  }
   // Multiple elements: split at midpoint
   const mid = Math.ceil(elements.length / 2);
   return [elements.slice(0, mid), elements.slice(mid)];
