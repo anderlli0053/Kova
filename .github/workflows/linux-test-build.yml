@@ -10,6 +10,10 @@ on:
         description: 'Pre-release tag (e.g. v0.6.5-test.1)'
         required: true
         default: 'v0.6.5-test.1'
+      version_override:
+        description: 'Override app version for this build (e.g. 0.6.999). Leave empty to use the real project version. Publishing a higher override to an existing tag lets an already-running test build detect it as an update.'
+        required: false
+        default: ''
 
 jobs:
   linux-test-build:
@@ -56,9 +60,18 @@ jobs:
         run: npm ci
 
       # Throwaway test build — skip updater artifacts so no minisign signing
-      # key is needed (the full release pipeline handles signed updates).
+      # key is needed for the deb/rpm bundles (the AppImage is signed
+      # separately below). version_override lets a repeat run publish a
+      # "new" higher version to the same tag, to test self-update against
+      # an already-running "old" build.
       - name: Build Linux bundles
-        run: npm run tauri build -- --bundles deb,rpm,appimage --config '{"bundle":{"createUpdaterArtifacts":false}}'
+        run: |
+          set -euo pipefail
+          CONFIG='{"bundle":{"createUpdaterArtifacts":false}}'
+          if [ -n "${{ inputs.version_override }}" ]; then
+            CONFIG=$(echo "$CONFIG" | jq --arg v "${{ inputs.version_override }}" '. + {version: $v}')
+          fi
+          npm run tauri build -- --bundles deb,rpm,appimage --config "$CONFIG"
 
       # linuxdeploy bundles libwayland-* (built on ubuntu-22.04). The host's
       # Mesa libEGL then loads those stale bundled wayland libs, breaking the
@@ -105,7 +118,8 @@ jobs:
 
           tauri signer sign "$APP"
 
-          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          VERSION="${{ inputs.version_override }}"
+          [ -n "$VERSION" ] || VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
           BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.tag }}"
           # tauri-cli 2.11.4's "*.sig" file already contains the final
           # base64 string latest.json expects (confirmed by generating a
@@ -123,15 +137,23 @@ jobs:
               platforms: {"linux-x86_64": {signature: $sig, url: $url}}}' \
             > src-tauri/target/release/bundle/latest.json
 
+      # Idempotent: a repeat run against the same tag (e.g. publishing a
+      # version_override'd "new" build to test self-update) uploads/clobbers
+      # into the existing release instead of failing on "already exists".
       - name: Publish pre-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           cd src-tauri/target/release/bundle
-          gh release create "${{ inputs.tag }}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Kova ${{ inputs.tag }} (Linux test build)" \
-            --prerelease \
-            --notes "Linux-only test build for issue #3. The AppImage has its over-bundled graphics libs (libEGL/Mesa/Wayland) stripped and repacked, then signed with the Tauri updater key. latest.json is included so this build can be used to test self-update in isolation (point a test build's updater endpoint at this tag)." \
-            deb/*.deb rpm/*.rpm appimage/*.AppImage latest.json
+          if gh release view "${{ inputs.tag }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "${{ inputs.tag }}" --repo "$GITHUB_REPOSITORY" --clobber \
+              deb/*.deb rpm/*.rpm appimage/*.AppImage latest.json
+          else
+            gh release create "${{ inputs.tag }}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Kova ${{ inputs.tag }} (Linux test build)" \
+              --prerelease \
+              --notes "Linux-only test build for issue #3. The AppImage has its over-bundled graphics libs (libEGL/Mesa/Wayland) stripped and repacked, then signed with the Tauri updater key. latest.json is included so this build can be used to test self-update in isolation (point a test build's updater endpoint at this tag)." \
+              deb/*.deb rpm/*.rpm appimage/*.AppImage latest.json
+          fi
