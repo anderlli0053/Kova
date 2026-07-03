@@ -3,7 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { open as openFileDialog } from '@tauri-apps/plugin-dialog';
 import { indentWithTab, undo, redo, selectAll } from '@codemirror/commands';
-import { Compartment, EditorSelection, EditorState, Prec } from '@codemirror/state';
+import { Annotation, Compartment, EditorSelection, EditorState, Prec } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { markdown } from '@codemirror/lang-markdown';
@@ -56,6 +56,10 @@ function makeRelativePath(docPath: string, target: string): string {
 function encodeMarkdownPath(p: string): string {
   return p.replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
+
+// Tags dispatches made by the content-sync effect so the update listener can
+// tell them apart from real user edits and skip marking the doc dirty.
+const externalSync = Annotation.define<boolean>();
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|webp|bmp|ico|avif|tiff?)$/i;
 const VIDEO_EXT = /\.(mp4|webm|ogv|mov|m4v|mkv)$/i;
@@ -653,7 +657,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
     if (!containerRef.current) return;
 
     const updateListener = EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
+      if (update.docChanged && !update.transactions.some((tr) => tr.annotation(externalSync))) {
         onChangeRef.current(update.state.doc.toString());
       }
       if (update.selectionSet || update.docChanged) {
@@ -1006,7 +1010,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
     // when they differ do we pay the line-ending-normalising compare. CodeMirror
     // collapses lone \r as well as \r\n, so both must be normalised here too.
     if (current !== content && current !== content.replace(/\r\n/g, '\n').replace(/\r/g, '\n')) {
-      view.dispatch({ changes: { from: 0, to: current.length, insert: content } });
+      view.dispatch({ changes: { from: 0, to: current.length, insert: content }, annotations: externalSync.of(true) });
     }
   }, [content]);
 
