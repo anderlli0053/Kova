@@ -8,6 +8,7 @@
 
 import { Menu, Submenu } from '@tauri-apps/api/menu';
 import { getVersion } from '@tauri-apps/api/app';
+import { recentFileMenuLabel } from './store/recentFiles';
 
 export interface MacMenuHandlers {
   newFile: () => void;
@@ -28,14 +29,12 @@ export interface MacMenuHandlers {
   openSettings: () => void;
 }
 
-const base = (p: string) => p.split(/[\\/]/).pop() || p;
-
 export async function buildMacMenu(h: MacMenuHandlers, recents: string[]): Promise<void> {
   const version = await getVersion().catch(() => '');
 
   const recentItems = recents.length
     ? [
-        ...recents.map((p) => ({ text: base(p), action: () => h.openRecent(p) })),
+        ...recents.map((p) => ({ text: recentFileMenuLabel(p, recents), action: () => h.openRecent(p) })),
         { item: 'Separator' as const },
         { text: 'Clear Menu', action: () => h.clearRecent() },
       ]

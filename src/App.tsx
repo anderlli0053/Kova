@@ -24,7 +24,7 @@ import { MissingThemeBanner } from './components/MissingThemeBanner';
 import { loadSettings, saveSettings, EDITOR_FONT_OPTIONS } from './store/settings';
 import type { AppSettings } from './store/settings';
 import { loadLastSession, saveLastSession } from './store/lastSession';
-import { loadRecentFiles, addRecentFile, removeRecentFile, clearRecentFiles } from './store/recentFiles';
+import { loadRecentFiles, addRecentFile, removeRecentFile, clearRecentFiles, recentFileBasename, recentFileMenuLabel } from './store/recentFiles';
 import { buildMacMenu } from './macMenu';
 import type { MacMenuHandlers } from './macMenu';
 import { loadKeybindings, matchShortcut, getCombo, formatCombo, isMac } from './engine/keybindings';
@@ -149,6 +149,7 @@ export default function App() {
   const [resolvedUiTheme, setResolvedUiTheme] = useState<'dark' | 'light'>('dark');
   const [fileMenuOpen, setFileMenuOpen]       = useState(false);
   const [importSubmenuOpen, setImportSubmenuOpen] = useState(false);
+  const [recentSubmenuOpen, setRecentSubmenuOpen] = useState(false);
   const [exportSubmenuOpen, setExportSubmenuOpen] = useState(false);
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const [editMenuOpen, setEditMenuOpen]       = useState(false);
@@ -1595,7 +1596,12 @@ export default function App() {
 
   // Close menus when the user clicks outside them.
   useEffect(() => {
-    if (!fileMenuOpen) return;
+    if (!fileMenuOpen) {
+      setImportSubmenuOpen(false);
+      setExportSubmenuOpen(false);
+      setRecentSubmenuOpen(false);
+      return;
+    }
     const onDown = (e: MouseEvent) => {
       if (fileMenuRef.current && !fileMenuRef.current.contains(e.target as Node)) {
         setFileMenuOpen(false);
@@ -1676,6 +1682,44 @@ export default function App() {
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setFileMenuOpen(false); handleOpenFile(); }}>
                 Open <span>{formatCombo(getCombo(keybindings.combos, 'openFile'))}</span>
               </button>
+              <div style={{ position: 'relative' }} onMouseEnter={() => setRecentSubmenuOpen(true)} onMouseLeave={() => setRecentSubmenuOpen(false)}>
+                <button
+                  className="btn-group-menu-item btn-group-menu-item--shortcut"
+                  aria-haspopup="true"
+                  aria-expanded={recentSubmenuOpen}
+                  onClick={() => setRecentSubmenuOpen((p) => !p)}
+                  onKeyDown={(e) => { if (e.key === 'ArrowRight' || e.key === 'Enter') setRecentSubmenuOpen(true); }}
+                >
+                  Open Recent <span>›</span>
+                </button>
+                {recentSubmenuOpen && (
+                  <div className="btn-group-menu btn-group-menu--sub">
+                    {recents.length === 0 ? (
+                      <button className="btn-group-menu-item" disabled>No Recent Files</button>
+                    ) : (
+                      <>
+                        {recents.map((p) => (
+                          <button
+                            key={p}
+                            className="btn-group-menu-item"
+                            title={p}
+                            onClick={() => { setFileMenuOpen(false); menuHandlersRef.current.openRecent(p); }}
+                          >
+                            {recentFileMenuLabel(p, recents)}
+                          </button>
+                        ))}
+                        <div className="btn-group-menu-separator" />
+                        <button
+                          className="btn-group-menu-item"
+                          onClick={() => { setFileMenuOpen(false); menuHandlersRef.current.clearRecent(); }}
+                        >
+                          Clear Menu
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
               <div style={{ position: 'relative' }} onMouseEnter={() => setImportSubmenuOpen(true)} onMouseLeave={() => setImportSubmenuOpen(false)}>
                 <button
                   className="btn-group-menu-item btn-group-menu-item--shortcut"
@@ -2203,7 +2247,7 @@ export default function App() {
               Open file
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
-              Opening <strong>{dropConfirmPath.split(/[\\/]/).pop()}</strong> will replace the current document.
+              Opening <strong>{recentFileBasename(dropConfirmPath)}</strong> will replace the current document.
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button className="btn" onClick={() => setDropConfirmPath(null)}>Cancel</button>
@@ -2216,7 +2260,10 @@ export default function App() {
                     await invoke('stop_watching').catch(() => {});
                     const text: string = await invoke('read_file', { path });
                     await applyFileContent(text, path);
-                  } catch (err) { console.error('Drop open failed:', err); }
+                  } catch (err) {
+                    console.error('Drop open failed:', err);
+                    setRecents(removeRecentFile(path));
+                  }
                 }}
               >Open</button>
             </div>
