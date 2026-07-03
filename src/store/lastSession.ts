@@ -7,11 +7,11 @@ export interface LastSession {
   slideIndex: number;
 }
 
-const KEY = 'kova:lastSession';
+const STORAGE_KEY = 'kova:lastSession';
 
 export function loadLastSession(): LastSession | null {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<LastSession>;
     if (typeof parsed.path === 'string' && typeof parsed.slideIndex === 'number') {
@@ -25,8 +25,8 @@ export function loadLastSession(): LastSession | null {
 
 export function saveLastSession(session: LastSession | null): void {
   try {
-    if (!session) localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, JSON.stringify(session));
+    if (!session) localStorage.removeItem(STORAGE_KEY);
+    else localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   } catch {
     // localStorage unavailable/full — last-session restore is a convenience,
     // not a correctness requirement, so fail silently.
