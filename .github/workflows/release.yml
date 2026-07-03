@@ -51,7 +51,7 @@ jobs:
           | **macOS** (Apple Silicon + Intel) | `.dmg` | Signed and notarised — double-click to install |
           | **Windows 10/11** | `.msi` or `_x64-setup.exe` | Click **More info → Run anyway** if SmartScreen appears (app is unsigned) |
           | **Linux** | `.deb` (Debian/Ubuntu) or `.rpm` (Fedora/RHEL/openSUSE) | Install via your package manager |
-          | **Linux AppImage** | `.AppImage` | Graphics libs stripped for compatibility with Arch/Fedora/etc. **No auto-update** — re-download manually for future releases. |
+          | **Linux AppImage** | `.AppImage` | Graphics libs stripped for compatibility with Arch/Fedora/etc. Supports auto-update. |
 
           > **Beta release** — expect rough edges. Please report bugs via [Issues](../../issues).
           NOTES
@@ -77,8 +77,10 @@ jobs:
             args: --target universal-apple-darwin
             rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-          # Linux — .deb and .rpm packages only
-          # AppImage EGL fix in progress; re-enabled once updater signing is resolved.
+          # Linux — .deb and .rpm via tauri-action; AppImage is built and
+          # signed separately below (see "Build, sign, and upload AppImage"),
+          # since it needs post-build stripping/repacking (issue #3) that
+          # tauri-action's own build+sign pipeline can't do in between.
           - platform: ubuntu-22.04
             args: '--bundles deb,rpm'
             rust_targets: ''
@@ -159,6 +161,67 @@ jobs:
           releaseDraft: true    # appears as a draft; publish manually after reviewing the assets
           prerelease: false
           args: ${{ matrix.args }}
+
+      # Builds and signs the AppImage, then patches this platform's latest.json
+      # (already written to the repo root by the step above) before it gets
+      # copied into the cross-platform-merge artifact below — so the fix
+      # lands without adding any new race condition.
+      #
+      # linuxdeploy bundles libwayland-* (built on ubuntu-22.04). The host's
+      # Mesa libEGL then loads those stale bundled wayland libs, breaking the
+      # Wayland-EGL handshake → "EGL_BAD_PARAMETER. Aborting..." (issue #3,
+      # confirmed fixed on Arch by @vadika). Strip them so the AppImage uses
+      # host libs, then sign the repacked bytes directly — stripping
+      # invalidates whatever signature Tauri would have computed at build
+      # time, so createUpdaterArtifacts:false skips generating one to begin
+      # with. Proven end-to-end (real self-update, download→verify→install→
+      # relaunch) via linux-test-build.yml on 2026-07-03.
+      - name: Build, sign, and upload AppImage
+        if: matrix.platform == 'ubuntu-22.04'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          npm run tauri build -- --bundles appimage --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          APPIMAGE_DIR="src-tauri/target/release/bundle/appimage"
+          APP=$(ls "$APPIMAGE_DIR"/*.AppImage | head -1)
+          APP_NAME=$(basename "$APP")
+
+          ( cd "$APPIMAGE_DIR"
+            ./"$APP_NAME" --appimage-extract >/dev/null
+            cd squashfs-root/usr/lib && rm -f \
+              libwayland-client.so* libwayland-cursor.so* libwayland-egl.so* libwayland-server.so* \
+              libEGL.so* libGL.so* libGLX.so* libGLdispatch.so* libOpenGL.so* \
+              libGLESv2.so* libgbm.so* libdrm.so* libEGL_mesa.so* libgallium*.so* \
+              && rm -rf dri/ )
+
+          wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          rm -f "$APP"
+          ( cd "$APPIMAGE_DIR" && ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP_NAME" )
+          rm -rf "$APPIMAGE_DIR/squashfs-root"
+
+          # Sign the final (post-strip) bytes directly. tauri-cli's "*.sig"
+          # file content is already the final base64 string latest.json
+          # expects — re-encoding it (e.g. base64 -w 0 < file.sig) would
+          # double-encode and produce a signature that fails verification.
+          npm install -g @tauri-apps/cli@^2
+          tauri signer sign "$APP"
+          SIG=$(cat "$APP.sig")
+
+          gh release upload "${{ github.ref_name }}" "$APP" --clobber
+
+          # tauri-action's deb/rpm build already populated latest.json's
+          # linux-x86_64 entry pointing at the .deb — Tauri's updater only
+          # supports AppImage on Linux, so that entry was never actually
+          # usable. Overwrite it with the signed AppImage instead.
+          jq --arg sig "$SIG" \
+             --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ github.ref_name }}/$APP_NAME" \
+             '.platforms["linux-x86_64"] = {signature: $sig, url: $url}' \
+             latest.json > /tmp/latest.json.new
+          mv /tmp/latest.json.new latest.json
 
       # Save this platform's latest.json as a workflow artifact so the finalize
       # job can merge all three into one before uploading to the release.
@@ -249,37 +312,6 @@ jobs:
           gh release upload "${{ github.ref_name }}" "$OUTNAME" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Build AppImage separately with createUpdaterArtifacts:false so no signing
-      # key is needed. Graphics libs are stripped (vadika's fix, issue #3) so it
-      # runs on non-Ubuntu hosts. Uploaded as a best-effort community build — the
-      # release notes make clear it has no auto-update.
-      - name: Build and upload AppImage (no auto-update)
-        if: matrix.platform == 'ubuntu-22.04'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          npm run tauri build -- --bundles appimage --config '{"bundle":{"createUpdaterArtifacts":false}}'
-          APPIMAGE_DIR="src-tauri/target/release/bundle/appimage"
-          APP=$(ls "$APPIMAGE_DIR"/*.AppImage | head -1)
-          APP_NAME=$(basename "$APP")
-
-          ( cd "$APPIMAGE_DIR"
-            ./"$APP_NAME" --appimage-extract >/dev/null
-            cd squashfs-root/usr/lib && rm -f \
-              libwayland-client.so* libwayland-cursor.so* libwayland-egl.so* libwayland-server.so* \
-              libEGL.so* libGL.so* libGLX.so* libGLdispatch.so* libOpenGL.so* \
-              libGLESv2.so* libgbm.so* libdrm.so* libEGL_mesa.so* libgallium*.so* \
-              && rm -rf dri/ )
-
-          wget -qO /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x /tmp/appimagetool
-          rm -f "$APP"
-          ( cd "$APPIMAGE_DIR" && ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP_NAME" )
-          rm -rf "$APPIMAGE_DIR/squashfs-root"
-
-          gh release upload "${{ github.ref_name }}" "$APP" --clobber
 
   # Runs after all platform builds. Adds stable-named (version-free) download
   # aliases so README links never need updating, then removes .sig files to

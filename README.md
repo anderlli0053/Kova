@@ -37,7 +37,7 @@ Kova turns plain Markdown into polished slides — with live preview, multiple l
 
 ## Linux package managers
 
-> **AppImage note** — The AppImage does not support auto-update; re-download manually from the [releases page](https://github.com/KovaMD/Kova/releases/latest) when a new version is available. See [issue #3](https://github.com/KovaMD/Kova/issues/3) for background.
+> **AppImage note** — Bundled graphics libs are stripped for compatibility with Arch/Fedora/etc., and the AppImage is signed so in-app auto-update works. See [issue #3](https://github.com/KovaMD/Kova/issues/3) for background.
 
 **Debian / Ubuntu**
 
