@@ -83,6 +83,41 @@ jobs:
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool squashfs-root "$APP"
           rm -rf squashfs-root
 
+      # Stripping+repacking above invalidates any signature Tauri computed at
+      # build time, so sign the final bytes directly instead — the same
+      # after-the-fact pattern fix-latest-json.yml already uses in production
+      # to re-sign a DMG/MSI: `tauri signer sign` reads the key/password from
+      # the environment and writes "<file>.sig" next to it. Builds a
+      # standalone latest.json pointing at this tag's AppImage so a test build
+      # of Kova (pointed at this tag via a --config endpoint override) can
+      # exercise a real self-update end-to-end before this lands in release.yml.
+      - name: Sign repacked AppImage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          npm install -g @tauri-apps/cli@^2
+
+          APPIMAGE_DIR="src-tauri/target/release/bundle/appimage"
+          APP=$(ls "$APPIMAGE_DIR"/*.AppImage | head -1)
+          APP_NAME=$(basename "$APP")
+
+          tauri signer sign "$APP"
+
+          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.tag }}"
+          SIG=$(base64 -w 0 < "$APP.sig")
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg sig "$SIG" \
+            --arg url "$BASE_URL/$APP_NAME" \
+            '{version: $version, notes: "AppImage auto-update prototype (issue #3)", pub_date: $pub_date,
+              platforms: {"linux-x86_64": {signature: $sig, url: $url}}}' \
+            > src-tauri/target/release/bundle/latest.json
+
       - name: Publish pre-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -93,5 +128,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "Kova ${{ inputs.tag }} (Linux test build)" \
             --prerelease \
-            --notes "Linux-only test build for issue #3. The AppImage has its over-bundled graphics libs (libEGL/Mesa/Wayland) stripped so it uses the host GL/Wayland stack." \
-            deb/*.deb rpm/*.rpm appimage/*.AppImage
+            --notes "Linux-only test build for issue #3. The AppImage has its over-bundled graphics libs (libEGL/Mesa/Wayland) stripped and repacked, then signed with the Tauri updater key. latest.json is included so this build can be used to test self-update in isolation (point a test build's updater endpoint at this tag)." \
+            deb/*.deb rpm/*.rpm appimage/*.AppImage latest.json
