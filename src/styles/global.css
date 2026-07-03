@@ -93,8 +93,10 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
-/* UI scale (Settings → Appearance). zoom on html remaps vw/vh to the scaled
-   layout viewport, so .app's 100vw/100vh fills the window at any scale.
+/* UI scale (Settings → Appearance). zoom on html scales the whole UI.
+   .app sizes with 100% (not vw/vh): WebKit multiplies vw/vh by the zoom
+   factor, overflowing the window at scale>1 and clipping the right panel.
+   Percentages cascade from html/body/#root (100%) and stay window-bound.
    Presentation overlays counter-zoom so slides stay pixel-exact. */
 html { zoom: var(--ui-scale, 1); }
 .pres-overlay, .pres-presenter { zoom: calc(1 / var(--ui-scale, 1)); }
@@ -102,8 +104,8 @@ html { zoom: var(--ui-scale, 1); }
 .app {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
 }
 
