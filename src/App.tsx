@@ -42,6 +42,7 @@ import { BUILT_IN_THEMES, DEFAULT_THEME, parseThemeYaml, sanitiseThemeOverrides,
 import { registerBundledFonts, registerCachedFont } from './engine/bundledFonts';
 import type { Slide, Frontmatter, ListItem } from './engine/types';
 import { parseAspectRatio } from './engine/types';
+import { detectLayout } from './engine/layout/autoLayout';
 import { imageMime } from './engine/export/imageMime';
 import type { Theme } from './engine/theme';
 
@@ -426,16 +427,21 @@ export default function App() {
         const cached = cache.get(slide);
         if (cached) return cached;
       }
-      const resolved: Slide = {
-        ...slide,
-        elements: slide.elements.map((el) => {
-          if (el.type === 'image' || el.type === 'video') return { ...el, src: resolveImageSrc(el.src, docDir, localImageUrls) };
-          if (el.type === 'paragraph') return { ...el, html: resolveHtmlSrcs(el.html, docDir, localImageUrls) };
-          if (el.type === 'list')      return { ...el, items: el.items.map(resolveItem) };
-          if (el.type === 'toc')       return { ...el, entries: tocEntries.filter((e) => e.index !== slide.index) };
-          return el;
-        }),
-      };
+      const resolvedElements = slide.elements.map((el) => {
+        if (el.type === 'image' || el.type === 'video') return { ...el, src: resolveImageSrc(el.src, docDir, localImageUrls) };
+        if (el.type === 'paragraph') return { ...el, html: resolveHtmlSrcs(el.html, docDir, localImageUrls) };
+        if (el.type === 'list')      return { ...el, items: el.items.map(resolveItem) };
+        if (el.type === 'toc')       return { ...el, entries: tocEntries.filter((e) => e.index !== slide.index) };
+        return el;
+      });
+      // detectLayout ran at parse time against a placeholder toc with zero
+      // entries (the real slide titles aren't known until this pass), so a
+      // long toc never tripped the two-column overflow guard. Re-run it now
+      // that entries are populated, unless the user pinned an explicit layout.
+      const layout = hasToc && !slide.layoutOverride
+        ? detectLayout(resolvedElements, slide.titleLevel, !!slide.title)
+        : slide.layout;
+      const resolved: Slide = { ...slide, elements: resolvedElements, layout };
       if (!hasToc) cache.set(slide, resolved);
       return resolved;
     });
