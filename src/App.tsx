@@ -454,6 +454,12 @@ export default function App() {
     ? Math.min(presentIndex, visibleSlides.length - 1)
     : 0;
 
+  // {title} in header/footer templates falls back to the deck's cover slide
+  // (first non-hidden H1) when frontmatter has no explicit `title:` — most
+  // decks only ever get a title via a heading, never via frontmatter, and a
+  // silently blank footer segment (issue #55) is worse than this guess.
+  const docTitle = frontmatter.title ?? rawSlides.find((s) => !s.hidden && s.titleLevel === 1)?.title ?? '';
+
   const aspectRatio = useMemo(
     () => parseAspectRatio(frontmatter.aspect_ratio as string | undefined),
     [frontmatter.aspect_ratio],
@@ -699,7 +705,7 @@ export default function App() {
           theme: activeTheme,
           index: startIndex,
           aspectRatio,
-          docTitle: frontmatter.title,
+          docTitle,
           docDate: frontmatter.date as string | undefined,
         };
 
@@ -786,7 +792,7 @@ export default function App() {
 
     setPresentMode(true);
     await getCurrentWindow().setFullscreen(true).catch(() => {});
-  }, [slides, visibleSlides, safeSlideIndex, activeTheme, aspectRatio, frontmatter.title, settings.presentationMode]);
+  }, [slides, visibleSlides, safeSlideIndex, activeTheme, aspectRatio, docTitle, settings.presentationMode]);
 
   // Prevent display sleep while presenting; release on exit.
   // Covers all exit paths (normal, error, external window close).
@@ -1644,7 +1650,7 @@ export default function App() {
           slides={visibleSlides}
           currentIndex={safePresentIndex}
           theme={activeTheme}
-          docTitle={frontmatter.title}
+          docTitle={docTitle}
           docDate={frontmatter.date as string | undefined}
           aspectRatio={aspectRatio}
           laserColor={settings.laserColor}
@@ -1658,7 +1664,7 @@ export default function App() {
           slides={visibleSlides}
           currentIndex={safePresentIndex}
           theme={activeTheme}
-          docTitle={frontmatter.title}
+          docTitle={docTitle}
           docDate={frontmatter.date as string | undefined}
           aspectRatio={aspectRatio}
           showNextSlide={settings.presenterShowNextSlide}
@@ -1941,7 +1947,7 @@ export default function App() {
               onToggleHidden={handleToggleHidden}
               onDelete={handleDeleteSlide}
               theme={activeTheme}
-              docTitle={frontmatter.title}
+              docTitle={docTitle}
               docDate={frontmatter.date as string | undefined}
               aspectRatio={aspectRatio}
             />
@@ -2306,7 +2312,7 @@ export default function App() {
                   theme={activeTheme}
                   slideNumber={i + 1}
                   totalSlides={printContext.slides.length}
-                  docTitle={frontmatter.title ?? ''}
+                  docTitle={docTitle}
                   docDate={frontmatter.date as string ?? ''}
                   onAllDiagramsReady={onPrintSlideReady.current}
                 />
@@ -2347,7 +2353,7 @@ export default function App() {
                   theme={activeTheme}
                   slideNumber={i + 1}
                   totalSlides={pdfExportContext.slides.length}
-                  docTitle={frontmatter.title ?? ''}
+                  docTitle={docTitle}
                   docDate={frontmatter.date as string ?? ''}
                   onAllDiagramsReady={onPdfSlideReady.current}
                 />

@@ -148,7 +148,10 @@ export async function exportToPptx(
   pres.layout = is4x3 ? 'LAYOUT_4x3' : 'LAYOUT_16x9';
   const H = is4x3 ? 7.5 : 5.625;
 
-  const docTitle = frontmatter.title ?? '';
+  // Falls back to the deck's cover slide (first H1) when frontmatter has no
+  // explicit `title:` — mirrors the same fallback used for the live preview
+  // (see docTitle in App.tsx), so exported footers/headers match what's shown.
+  const docTitle = frontmatter.title ?? slides.find((s) => s.titleLevel === 1)?.title ?? '';
   const docDate  = frontmatter.date != null ? String(frontmatter.date) : '';
   const warnings: string[] = [];
 
