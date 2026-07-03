@@ -107,7 +107,12 @@ jobs:
 
           VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
           BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${{ inputs.tag }}"
-          SIG=$(base64 -w 0 < "$APP.sig")
+          # tauri-cli 2.11.4's "*.sig" file already contains the final
+          # base64 string latest.json expects (confirmed by generating a
+          # throwaway test keypair and inspecting the raw file) — re-encoding
+          # it here would double-encode and produce a signature that fails
+          # verification.
+          SIG=$(cat "$APP.sig")
 
           jq -n \
             --arg version "$VERSION" \
