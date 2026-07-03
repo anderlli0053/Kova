@@ -1,4 +1,5 @@
 import PptxGenJS from 'pptxgenjs';
+import JSZip from 'jszip';
 import { invoke } from '@tauri-apps/api/core';
 import { mermaidSvgCache } from './mermaidSvgCache';
 import { svgToPngDataUrl } from './svgToPng';
@@ -121,12 +122,7 @@ async function resolveSlideImages(slides: Slide[], theme: Theme, warnings: strin
       } else if (el.type === 'mermaid') {
         const result = await mermaidToDataUrl(el.value, theme);
         if (result) {
-          // For portrait diagrams (AR < 1) containArea places them in a narrow
-          // column, making text illegibly small. Omit the AR so tryAddImage fills
-          // the available area instead — the slight horizontal stretch is far
-          // more readable than 4-5pt text. Landscape diagrams keep containArea.
-          const arTitle = result.aspectRatio >= 1 ? String(result.aspectRatio) : undefined;
-          elements.push({ type: 'image' as const, src: result.dataUrl, alt: 'Diagram', title: arTitle });
+          elements.push({ type: 'image' as const, src: result.dataUrl, alt: 'Diagram', title: String(result.aspectRatio) });
         } else {
           warnings.push(`Mermaid diagram could not be rendered and was skipped (slide: "${slide.title ?? 'untitled'}")`);
           elements.push(el);
@@ -178,8 +174,31 @@ export async function exportToPptx(
     addSlide(pSlide as PS, resolvedSlides[i], theme, meta, H, warnings, logoDataUrl, logoAr);
   }
 
-  const base64 = (await pres.write({ outputType: 'base64' })) as string;
+  const rawBase64 = (await pres.write({ outputType: 'base64' })) as string;
+  const base64 = await applyFadeTransitions(rawBase64, resolvedSlides.length);
   return { base64, warnings };
+}
+
+// PptxGenJS has no API for slide transitions, so the fade used between slides in
+// presentation mode (PresentationOverlay.tsx) is applied by patching the generated
+// OOXML directly — "Fade Through Black" is the closest built-in PowerPoint transition
+// to that black fade-overlay effect.
+const TRANSITION_XML =
+  '<p:transition spd="fast" p14:dur="300" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">' +
+  '<p:fade thruBlk="1"/>' +
+  '</p:transition>';
+
+async function applyFadeTransitions(base64: string, slideCount: number): Promise<string> {
+  const zip = await JSZip.loadAsync(base64, { base64: true });
+  for (let i = 1; i <= slideCount; i++) {
+    const path = `ppt/slides/slide${i}.xml`;
+    const file = zip.file(path);
+    if (!file) continue;
+    const xml = await file.async('string');
+    if (xml.includes('<p:transition')) continue;
+    zip.file(path, xml.replace('</p:sld>', `${TRANSITION_XML}</p:sld>`));
+  }
+  return zip.generateAsync({ type: 'base64' });
 }
 
 // ── Per-slide dispatcher ──────────────────────────────────────────────────────
