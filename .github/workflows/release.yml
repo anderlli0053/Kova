@@ -29,14 +29,18 @@ jobs:
           ## What's new
 
           ### New features
-          - **Table of Contents slide discoverability** — the Insert menu now adds an Agenda slide with `!toc` (by @Ayush7614, #104).
-          - **Export menu grouped under a submenu** — File menu export items (PDF, PPTX, HTML) now live under a single Export submenu, mirroring the existing Import submenu.
-          - **Local video now inlines into standalone HTML export** — `!video[label](path)` sources are embedded as base64 data URIs, so exported HTML plays video outside the app instead of a dead `asset://` link.
+          - **Duplicate and delete slide from the thumbnail context menu** — right-click a slide thumbnail to duplicate it (preserving hidden markers, speaker notes, and custom elements) or delete it (by @Ayush7614, #111).
+          - **Hide/show slide keyboard shortcut** — toggle a slide's hidden state with Ctrl+Shift+H, configurable via `hide_slide` in keybindings.yaml (by @Ayush7614, #107).
+          - **Open Recent submenu for Windows/Linux** — the File menu now shows recently opened documents on Windows/Linux, matching the existing macOS menu (by @Ayush7614, #106).
 
           ### Bug fixes
-          - **Fixed unedited CRLF files showing as changed on open** — opening a Windows-line-ending file immediately marked it dirty and prompted to save on exit, even with no edits (reported by @a1880, #95).
-          - **Fixed local video embeds being silently broken since v0.6.9** — an unrelated PDF export fix had accidentally reverted the `!video` feature; it's restored.
-          - **Fixed footer/header customisations still reverting on reopen** — v0.6.9 fixed template variables being stripped, but Branding-panel edits (footer/header/logo) were still discarded on reopen or external reload whenever the theme had no explicit `theme:` key set (#55).
+          - **Fixed files marked dirty just from opening a second document** — the content-sync dispatch used to load a new file into an already-mounted editor was indistinguishable from a real edit, so the file was flagged as changed even with no edits made.
+          - **Fixed `{title}` disappearing from footer/header templates** — decks that set their title via a heading instead of YAML frontmatter had no fallback, so multi-segment footer/header templates silently dropped the title segment (reported by @a1880, #55).
+          - **Fixed Table of Contents not working from the audience screen, and overflowing long agendas** — ToC links only navigated from the preview/presenter view, and long lists overflowed instead of splitting into two columns like elsewhere in the app (reported by @a1880, #57).
+          - **Fixed distorted Mermaid diagrams in PPTX export** — portrait flowcharts were stretched to fill the slide instead of keeping their proportions; PPTX export also now includes the same fade transition used in presentation mode.
+          - **Fixed interface-scale setting clipping the right panel** — at scale >1, WebKit's viewport-unit handling made the app wider than the window, cutting off the inspector panel (by @vadika, #119).
+          - **Fixed lone `\r` line endings still triggering false "unsaved changes"** — classic Mac-style line endings weren't covered by the earlier CRLF dirty-check fix.
+          - **Fixed blockquotes losing lists and inline formatting** — quotes were flattened into a single run-on string, dropping list markers, line breaks, and bold/italic; now preserved in both the generic quote element and the standalone quote layout (reported by @codingThome, #116; fixed by @vadika, #118).
 
           ---
 
