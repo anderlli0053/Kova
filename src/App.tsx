@@ -1589,10 +1589,14 @@ export default function App() {
       if (matchShortcut(e, sc('save')))      { e.preventDefault(); if (filePath) handleSave(); else handleSaveAs(); }
       if (matchShortcut(e, sc('saveAs')))    { e.preventDefault(); handleSaveAs(); }
       if (matchShortcut(e, sc('focusMode'))) { e.preventDefault(); toggleFocusMode(); }
+      if (matchShortcut(e, sc('hideSlide')) && slides.length > 0) {
+        e.preventDefault();
+        handleToggleHidden(safeSlideIndex);
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [presentMode, keybindings.combos, filePath, handleNewFile, handleOpenFile, handleSave, handleSaveAs, toggleFocusMode, handlePresentEnter]);
+  }, [presentMode, keybindings.combos, filePath, slides.length, safeSlideIndex, handleNewFile, handleOpenFile, handleSave, handleSaveAs, toggleFocusMode, handlePresentEnter, handleToggleHidden]);
 
   // Close menus when the user clicks outside them.
   useEffect(() => {

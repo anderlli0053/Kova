@@ -696,13 +696,14 @@ const DEFAULT_KEYBINDINGS: &str = "\
 # Modifiers (combine with +):  ctrl  shift  alt
 #
 # Available actions:
-#   new_file    open_file    save    save_as    focus_mode
+#   new_file    open_file    save    save_as    focus_mode    hide_slide
 
 new_file:   ctrl+n
 open_file:  ctrl+o
 save:       ctrl+s
 save_as:    ctrl+shift+s
 focus_mode: ctrl+shift+f
+hide_slide: ctrl+shift+h
 ";
 
 /// Reads keybindings.yaml from the platform config dir, creating it from defaults if absent.

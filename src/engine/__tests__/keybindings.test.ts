@@ -149,6 +149,7 @@ describe('getCombo', () => {
 
   it('falls back to default combo when user has not customised', () => {
     expect(getCombo({}, 'save')).toBe(DEFAULT_COMBOS.save);
+    expect(getCombo({}, 'hideSlide')).toBe('ctrl+shift+h');
   });
 
   it('falls back to empty string for unknown action', () => {
@@ -165,7 +166,7 @@ describe('getCombo', () => {
 
 describe('DEFAULT_COMBOS', () => {
   it('defines all expected actions', () => {
-    const expected = ['newFile', 'openFile', 'save', 'saveAs', 'focusMode'];
+    const expected = ['newFile', 'openFile', 'save', 'saveAs', 'focusMode', 'hideSlide'];
     for (const action of expected) {
       expect(DEFAULT_COMBOS[action], action).toBeTruthy();
     }

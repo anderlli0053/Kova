@@ -13,6 +13,7 @@ const KEY_MAP: Record<string, string> = {
   save:       'save',
   save_as:    'saveAs',
   focus_mode: 'focusMode',
+  hide_slide: 'hideSlide',
 };
 
 export const DEFAULT_COMBOS: Record<string, string> = {
@@ -21,6 +22,7 @@ export const DEFAULT_COMBOS: Record<string, string> = {
   save:      'ctrl+s',
   saveAs:    'ctrl+shift+s',
   focusMode: 'ctrl+shift+f',
+  hideSlide: 'ctrl+shift+h',
 };
 
 export interface Keybindings {
