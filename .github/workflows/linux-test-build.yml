@@ -64,14 +64,21 @@ jobs:
       # separately below). version_override lets a repeat run publish a
       # "new" higher version to the same tag, to test self-update against
       # an already-running "old" build.
+      #
+      # version_override patches tauri.conf.json's version *on disk* rather
+      # than via --config: tauri::generate_context!() is a compile-time proc
+      # macro that reads the literal file, so a --config CLI override only
+      # changes the post-compile bundler/manifest metadata (bundle filename,
+      # latest.json) while the compiled app keeps reporting its old version —
+      # confirmed by building both ways locally and inspecting the binary.
       - name: Build Linux bundles
         run: |
           set -euo pipefail
-          CONFIG='{"bundle":{"createUpdaterArtifacts":false}}'
           if [ -n "${{ inputs.version_override }}" ]; then
-            CONFIG=$(echo "$CONFIG" | jq --arg v "${{ inputs.version_override }}" '. + {version: $v}')
+            jq --arg v "${{ inputs.version_override }}" '.version = $v' src-tauri/tauri.conf.json > /tmp/tauri.conf.json.tmp
+            mv /tmp/tauri.conf.json.tmp src-tauri/tauri.conf.json
           fi
-          npm run tauri build -- --bundles deb,rpm,appimage --config "$CONFIG"
+          npm run tauri build -- --bundles deb,rpm,appimage --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
       # linuxdeploy bundles libwayland-* (built on ubuntu-22.04). The host's
       # Mesa libEGL then loads those stale bundled wayland libs, breaking the
