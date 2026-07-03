@@ -125,6 +125,18 @@ export function PresentationOverlay({
           break;
         case 'Escape':
           e.preventDefault(); e.stopPropagation(); onExit(); break;
+        case 'Enter':
+          // Real keystrokes on the focused jump input never reach here (the
+          // HTMLInputElement check above returns early); this only fires for
+          // synthetic keydowns forwarded from the audience window, whose
+          // target is `window` rather than the input element.
+          if (jumpInput !== null) {
+            e.preventDefault(); e.stopPropagation();
+            const n = parseInt(jumpInput, 10);
+            if (!isNaN(n)) onNavigate(Math.min(Math.max(n - 1, 0), total - 1));
+            setJumpInput(null);
+          }
+          break;
         default:
           if (/^\d$/.test(e.key)) {
             e.preventDefault(); e.stopPropagation();
@@ -134,7 +146,7 @@ export function PresentationOverlay({
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [goNext, goPrev, onNavigate, total, onExit, slide, resetIdle]);
+  }, [goNext, goPrev, onNavigate, total, onExit, slide, resetIdle, jumpInput]);
 
   // ── Scroll wheel handler ───────────────────────────────────────────────────
 
