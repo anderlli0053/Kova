@@ -465,6 +465,7 @@ export default function App() {
   // decks only ever get a title via a heading, never via frontmatter, and a
   // silently blank footer segment (issue #55) is worse than this guess.
   const docTitle = frontmatter.title ?? rawSlides.find((s) => !s.hidden && s.titleLevel === 1)?.title ?? '';
+  const docDate = (frontmatter.date as string | undefined) ?? new Date().toISOString().slice(0, 10);
 
   const aspectRatio = useMemo(
     () => parseAspectRatio(frontmatter.aspect_ratio as string | undefined),
@@ -712,7 +713,7 @@ export default function App() {
           index: startIndex,
           aspectRatio,
           docTitle,
-          docDate: frontmatter.date as string | undefined,
+          docDate,
         };
 
         // Close any stale audience window from a previous failed session to
@@ -1657,7 +1658,7 @@ export default function App() {
           currentIndex={safePresentIndex}
           theme={activeTheme}
           docTitle={docTitle}
-          docDate={frontmatter.date as string | undefined}
+          docDate={docDate}
           aspectRatio={aspectRatio}
           laserColor={settings.laserColor}
           showTimer={settings.presenterShowTimer}
@@ -1671,7 +1672,7 @@ export default function App() {
           currentIndex={safePresentIndex}
           theme={activeTheme}
           docTitle={docTitle}
-          docDate={frontmatter.date as string | undefined}
+          docDate={docDate}
           aspectRatio={aspectRatio}
           showNextSlide={settings.presenterShowNextSlide}
           showTimer={settings.presenterShowTimer}
@@ -1954,7 +1955,7 @@ export default function App() {
               onDelete={handleDeleteSlide}
               theme={activeTheme}
               docTitle={docTitle}
-              docDate={frontmatter.date as string | undefined}
+              docDate={docDate}
               aspectRatio={aspectRatio}
             />
           </Panel>
@@ -2319,7 +2320,7 @@ export default function App() {
                   slideNumber={i + 1}
                   totalSlides={printContext.slides.length}
                   docTitle={docTitle}
-                  docDate={frontmatter.date as string ?? ''}
+                  docDate={docDate}
                   onAllDiagramsReady={onPrintSlideReady.current}
                 />
               </div>
@@ -2360,7 +2361,7 @@ export default function App() {
                   slideNumber={i + 1}
                   totalSlides={pdfExportContext.slides.length}
                   docTitle={docTitle}
-                  docDate={frontmatter.date as string ?? ''}
+                  docDate={docDate}
                   onAllDiagramsReady={onPdfSlideReady.current}
                 />
               </div>
