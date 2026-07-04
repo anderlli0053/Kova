@@ -1,3 +1,5 @@
+import { useT } from '../i18n';
+
 interface Action { label: string; onClick: () => void; }
 
 interface Props {
@@ -7,6 +9,7 @@ interface Props {
 }
 
 export function InfoBanner({ message, actions = [], onDismiss }: Props) {
+  const t = useT();
   return (
     <div style={{
       position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
@@ -33,7 +36,7 @@ export function InfoBanner({ message, actions = [], onDismiss }: Props) {
       <button
         type="button"
         onClick={onDismiss}
-        title="Dismiss"
+        title={t('common.dismiss')}
         style={{
           flexShrink: 0, background: 'none', border: 'none', color: 'var(--text-muted)',
           cursor: 'pointer', padding: 4, borderRadius: 4, lineHeight: 1,

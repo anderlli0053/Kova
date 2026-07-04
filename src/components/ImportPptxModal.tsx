@@ -3,6 +3,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { parsePptx } from '../engine/import/parsePptx';
 import { pptxToMarkdown } from '../engine/import/pptxToMarkdown';
+import { useT } from '../i18n';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,21 +21,21 @@ interface DoneState {
 const CHECK = '✓';
 const CROSS  = '✗';
 
-const WILL_IMPORT: string[] = [
-  'Slide content and order',
-  'Text — titles, body, bullet lists',
-  'Images (extracted and saved locally)',
-  'Tables',
-  'Speaker notes',
-];
+const WILL_IMPORT_KEYS = [
+  'modals.importPptxWill1',
+  'modals.importPptxWill2',
+  'modals.importPptxWill3',
+  'modals.importPptxWill4',
+  'modals.importPptxWill5',
+] as const;
 
-const WONT_IMPORT: string[] = [
-  'Themes, colours, and fonts — apply a Kova theme after import',
-  'Animations and transitions',
-  'SmartArt diagrams',
-  'Charts and graphs',
-  'Slide backgrounds and decorative shapes',
-];
+const WONT_IMPORT_KEYS = [
+  'modals.importPptxWont1',
+  'modals.importPptxWont2',
+  'modals.importPptxWont3',
+  'modals.importPptxWont4',
+  'modals.importPptxWont5',
+] as const;
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ interface ImportPptxModalProps {
 }
 
 export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
+  const t = useT();
   const [step, setStep]             = useState<Step>('select');
   const [pptxPath, setPptxPath]     = useState<string>('');
   const [progress, setProgress]     = useState('');
@@ -77,16 +79,16 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
     const destDir  = savePath.replace(/[\\/][^\\/]+$/, ''); // parent directory
 
     setStep('processing');
-    setProgress('Reading file…');
+    setProgress(t('modals.importPptxReadingFile'));
 
     try {
-      setProgress('Parsing slides…');
+      setProgress(t('modals.importPptxParsingSlides'));
       const parseResult = await parsePptx(pptxPath, destDir);
 
-      setProgress('Generating markdown…');
+      setProgress(t('modals.importPptxGeneratingMarkdown'));
       const markdown = pptxToMarkdown(parseResult);
 
-      setProgress('Saving file…');
+      setProgress(t('modals.importPptxSavingFile'));
       await invoke('write_file', { path: savePath, content: markdown });
 
       setDoneState({
@@ -99,7 +101,7 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.toLowerCase().includes('password') || msg.toLowerCase().includes('encrypted')) {
-        setErrorMsg('This file is password-protected and cannot be imported.');
+        setErrorMsg(t('modals.importPptxPasswordProtected'));
       } else {
         setErrorMsg(msg);
       }
@@ -132,18 +134,17 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
           <>
             <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                Import from PowerPoint
+                {t('modals.importPptxTitle')}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Convert a .pptx file to a Kova presentation. Layout will be
-                approximated — you may need to adjust some slides manually.
+                {t('modals.importPptxDescription')}
               </div>
             </div>
 
             {/* File picker row */}
             <div style={{ padding: '16px 24px 0', flexShrink: 0 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                PowerPoint file
+                {t('modals.importPptxFileLabel')}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <div style={{
@@ -153,10 +154,10 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   cursor: 'pointer',
                 }} onClick={handleBrowse} title={pptxPath || undefined}>
-                  {pptxPath ? pptxPath.split(/[\\/]/).pop() : 'No file selected'}
+                  {pptxPath ? pptxPath.split(/[\\/]/).pop() : t('modals.importPptxNoFileSelected')}
                 </div>
                 <button className="btn" onClick={handleBrowse} style={{ flexShrink: 0 }}>
-                  Browse…
+                  {t('modals.importPptxBrowse')}
                 </button>
               </div>
             </div>
@@ -166,23 +167,23 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    What will be imported
+                    {t('modals.importPptxWillImport')}
                   </div>
-                  {WILL_IMPORT.map((item) => (
-                    <div key={item} style={{ display: 'flex', gap: 6, marginBottom: 5, fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                  {WILL_IMPORT_KEYS.map((key) => (
+                    <div key={key} style={{ display: 'flex', gap: 6, marginBottom: 5, fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.4 }}>
                       <span style={{ color: '#4caf50', flexShrink: 0 }}>{CHECK}</span>
-                      <span>{item}</span>
+                      <span>{t(key)}</span>
                     </div>
                   ))}
                 </div>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    What will not be imported
+                    {t('modals.importPptxWontImport')}
                   </div>
-                  {WONT_IMPORT.map((item) => (
-                    <div key={item} style={{ display: 'flex', gap: 6, marginBottom: 5, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                  {WONT_IMPORT_KEYS.map((key) => (
+                    <div key={key} style={{ display: 'flex', gap: 6, marginBottom: 5, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
                       <span style={{ color: 'var(--text-tertiary, var(--text-secondary))', flexShrink: 0 }}>{CROSS}</span>
-                      <span>{item}</span>
+                      <span>{t(key)}</span>
                     </div>
                   ))}
                 </div>
@@ -191,13 +192,13 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
 
             {/* Actions */}
             <div style={{ padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button
                 className="btn btn-primary"
                 disabled={!pptxPath}
                 onClick={handleImport}
               >
-                Continue
+                {t('modals.importPptxContinue')}
               </button>
             </div>
           </>
@@ -207,7 +208,7 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
         {step === 'processing' && (
           <div style={{ padding: 32, textAlign: 'center' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 12 }}>
-              Importing…
+              {t('modals.importPptxImporting')}
             </div>
             <div style={{
               width: 32, height: 32, borderRadius: '50%',
@@ -225,10 +226,10 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
           <>
             <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                Import complete
+                {t('modals.importPptxComplete')}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                {doneState.slideCount} slide{doneState.slideCount !== 1 ? 's' : ''} imported
+                {t('modals.importPptxSlidesImported', { count: doneState.slideCount })}
               </div>
             </div>
 
@@ -243,7 +244,7 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
                   }}
                   onClick={() => { warningsOpenRef.current = !warningsOpenRef.current; setWarningsOpen(o => !o); }}
                 >
-                  <span>{doneState.warnings.length} item{doneState.warnings.length !== 1 ? 's' : ''} skipped</span>
+                  <span>{t('modals.importPptxItemsSkipped', { count: doneState.warnings.length })}</span>
                   <span>{warningsOpen ? '▲' : '▼'}</span>
                 </button>
                 {warningsOpen && (
@@ -262,14 +263,14 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
 
             <div style={{ padding: '8px 24px 4px', flex: 1, display: 'flex', alignItems: 'center' }}>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                Saved to: <span style={{ color: 'var(--text-primary)', wordBreak: 'break-all' }}>{doneState.savedPath}</span>
+                {t('modals.importPptxSavedToLabel')} <span style={{ color: 'var(--text-primary)', wordBreak: 'break-all' }}>{doneState.savedPath}</span>
               </div>
             </div>
 
             <div style={{ padding: '12px 24px 20px', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
-              <button className="btn" onClick={onClose}>Close</button>
+              <button className="btn" onClick={onClose}>{t('common.close')}</button>
               <button className="btn btn-primary" onClick={handleOpenInEditor}>
-                Open in Editor
+                {t('modals.importPptxOpenInEditor')}
               </button>
             </div>
           </>
@@ -280,7 +281,7 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
           <>
             <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-                Import failed
+                {t('modals.importPptxFailed')}
               </div>
             </div>
             <div style={{ padding: '12px 24px', flex: 1 }}>
@@ -294,8 +295,8 @@ export function ImportPptxModal({ onImported, onClose }: ImportPptxModalProps) {
               </div>
             </div>
             <div style={{ padding: '0 24px 20px', display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
-              <button className="btn" onClick={() => setStep('select')}>Back</button>
-              <button className="btn" onClick={onClose}>Close</button>
+              <button className="btn" onClick={() => setStep('select')}>{t('common.back')}</button>
+              <button className="btn" onClick={onClose}>{t('common.close')}</button>
             </div>
           </>
         )}

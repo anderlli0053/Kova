@@ -24,6 +24,7 @@ import {
   ignoreSpellingFor,
 } from '../../engine/spellcheck/spellChecker';
 import type { SpellCheckLanguage } from '../../engine/spellcheck/spellChecker';
+import { useT } from '../../i18n';
 import '../../styles/editor.css';
 
 interface Props {
@@ -535,6 +536,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
   { content, onChange, onCursorSlide, onWarn, onSaveAs, focusMode = false, filePath, uiTheme = 'dark', editorFontFamily = DEFAULT_FONT_FAMILY, wordWrap = true, spellCheckEnabled = false, spellCheckLanguage = 'en_US' }: Props,
   ref,
 ) {
+  const t = useT();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const fontSizeRef = useRef(DEFAULT_FONT_SIZE);
@@ -789,7 +791,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
         const pos = view.posAtCoords({ x, y }) ?? view.state.doc.length;
         const docPath = filePathRef.current ?? null;
         if (!docPath) {
-          onWarnRef.current?.('Save your document first before dropping media.');
+          onWarnRef.current?.(t('editor.saveFirstDropMedia'));
           return;
         }
 
@@ -837,7 +839,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
         void (async () => {
           const docPath = filePathRef.current ?? null;
           if (!docPath) {
-            onWarnRef.current?.('Save your document first before pasting media.');
+            onWarnRef.current?.(t('editor.saveFirstPasteMedia'));
             return;
           }
           const docDir = docPath.substring(
@@ -865,7 +867,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             view.focus();
           } catch (err) {
             console.error('[Kova] paste media failed:', err);
-            onWarnRef.current?.('Could not paste media.');
+            onWarnRef.current?.(t('editor.couldNotPasteMedia'));
           }
         })();
       };
@@ -919,7 +921,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
         if (mediaBase64 !== null) {
           const docPath = filePathRef.current ?? null;
           if (!docPath) {
-            onWarnRef.current?.('Save your document first before pasting media.');
+            onWarnRef.current?.(t('editor.saveFirstPasteMedia'));
             return;
           }
           const docDir = docPath.substring(
@@ -944,7 +946,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             view.focus();
           } catch (err) {
             console.error('[Kova] paste media failed:', err);
-            onWarnRef.current?.('Could not paste media.');
+            onWarnRef.current?.(t('editor.couldNotPasteMedia'));
           }
           return;
         }
@@ -1182,16 +1184,16 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             },
           }));
         } else {
-          spellEntries.push({ type: 'item', label: 'No suggestions', disabled: true, action: () => {} });
+          spellEntries.push({ type: 'item', label: t('editor.menuNoSuggestions'), disabled: true, action: () => {} });
         }
         spellEntries.push({
           type: 'item',
-          label: 'Add to Kova\'s dictionary',
+          label: t('editor.menuAddToDictionary'),
           action: () => addCustomWord(wordInfo.word),
         });
         spellEntries.push({
           type: 'item',
-          label: 'Ignore',
+          label: t('editor.menuIgnore'),
           action: () => ignoreSpellingFor(wordInfo.word),
         });
         spellEntries.push({ type: 'divider' });
@@ -1200,36 +1202,36 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
 
     return [
       ...spellEntries,
-      { type: 'header', label: 'Clipboard' },
-      { type: 'item', label: 'Copy',  shortcut: `${mod}+C`, action: doCopy,  disabled: !hasSel },
-      { type: 'item', label: 'Cut',   shortcut: `${mod}+X`, action: doCut,   disabled: !hasSel },
-      { type: 'item', label: 'Paste', shortcut: `${mod}+V`, action: doPaste },
+      { type: 'header', label: t('editor.menuClipboard') },
+      { type: 'item', label: t('editor.menuCopy'),  shortcut: `${mod}+C`, action: doCopy,  disabled: !hasSel },
+      { type: 'item', label: t('editor.menuCut'),   shortcut: `${mod}+X`, action: doCut,   disabled: !hasSel },
+      { type: 'item', label: t('editor.menuPaste'), shortcut: `${mod}+V`, action: doPaste },
       { type: 'divider' },
-      { type: 'header', label: 'Format' },
-      { type: 'item', label: 'Bold',          shortcut: `${mod}+B`,       action: () => doWrap('**',  '**',   'bold text') },
-      { type: 'item', label: 'Italic',        shortcut: `${mod}+I`,       action: () => doWrap('*',   '*',    'italic text') },
-      { type: 'item', label: 'Underline',     shortcut: `${mod}+U`,       action: () => doWrap('<u>', '</u>', 'underlined text') },
-      { type: 'item', label: 'Strikethrough', shortcut: `${mod}+Shift+X`, action: () => doWrap('~~',  '~~',   'strikethrough text') },
-      { type: 'item', label: 'Inline Code',   shortcut: `${mod}+\``,      action: () => doWrap('`',   '`',    'code') },
-      { type: 'item', label: 'Indent',        shortcut: `${mod}+]`,       action: () => { const v = viewRef.current; if (v) indentLine(v); } },
-      { type: 'item', label: 'Dedent',        shortcut: `${mod}+[`,       action: () => { const v = viewRef.current; if (v) dedentLine(v); } },
+      { type: 'header', label: t('editor.menuFormat') },
+      { type: 'item', label: t('editor.menuBold'),          shortcut: `${mod}+B`,       action: () => doWrap('**',  '**',   'bold text') },
+      { type: 'item', label: t('editor.menuItalic'),        shortcut: `${mod}+I`,       action: () => doWrap('*',   '*',    'italic text') },
+      { type: 'item', label: t('editor.menuUnderline'),     shortcut: `${mod}+U`,       action: () => doWrap('<u>', '</u>', 'underlined text') },
+      { type: 'item', label: t('editor.menuStrikethrough'), shortcut: `${mod}+Shift+X`, action: () => doWrap('~~',  '~~',   'strikethrough text') },
+      { type: 'item', label: t('editor.menuInlineCode'),    shortcut: `${mod}+\``,      action: () => doWrap('`',   '`',    'code') },
+      { type: 'item', label: t('editor.menuIndent'),        shortcut: `${mod}+]`,       action: () => { const v = viewRef.current; if (v) indentLine(v); } },
+      { type: 'item', label: t('editor.menuDedent'),        shortcut: `${mod}+[`,       action: () => { const v = viewRef.current; if (v) dedentLine(v); } },
       { type: 'divider' },
       {
-        type: 'submenu', label: 'Insert', entries: [
-          { type: 'item', label: 'Code Block',      action: () => doInsert('```\n\n```', 3) },
-          { type: 'item', label: 'Blockquote',      action: () => doInsert('> ', 2) },
-          { type: 'item', label: 'Table', action: () => { setTableRows(3); setTableCols(3); setTablePromptOpen(true); } },
-          { type: 'item', label: 'Horizontal Rule', action: () => doInsert('\n<hr>\n', 5) },
+        type: 'submenu', label: t('editor.menuInsert'), entries: [
+          { type: 'item', label: t('editor.menuCodeBlock'),      action: () => doInsert('```\n\n```', 3) },
+          { type: 'item', label: t('editor.menuBlockquote'),     action: () => doInsert('> ', 2) },
+          { type: 'item', label: t('editor.menuTable'), action: () => { setTableRows(3); setTableCols(3); setTablePromptOpen(true); } },
+          { type: 'item', label: t('editor.menuHorizontalRule'), action: () => doInsert('\n<hr>\n', 5) },
           {
-            type: 'item', label: 'Image or Video…', action: async () => {
+            type: 'item', label: t('editor.menuImageOrVideo'), action: async () => {
               // Resolve the document path before opening any picker.
               // If unsaved, explain why and offer to save first.
               let docPath = filePathRef.current ?? null;
               if (!docPath) {
                 const ok = await showConfirmRef.current(
-                  'Save document first',
-                  'Your document needs to be saved before inserting media, so Kova knows where to place it.',
-                  'Save',
+                  t('editor.saveDocumentFirstTitle'),
+                  t('editor.saveDocumentFirstMessage'),
+                  t('common.save'),
                 );
                 if (!ok) return;
                 docPath = await onSaveAsRef.current?.() ?? null;
@@ -1251,36 +1253,36 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
               view.focus();
             },
           },
-          { type: 'item', label: 'Link',            action: () => doInsert('[link text](url)', 1) },
-          { type: 'item', label: 'Math/LaTeX Block', action: () => doInsert('$$\nE = mc^2\n$$', 3) },
-          { type: 'item', label: 'Speaker Notes',   action: () => doInsert('\n\n???\n\n', 7) },
-          { type: 'item', label: 'Reference',       action: () => doInsert('!ref[]', 5) },
+          { type: 'item', label: t('editor.menuLink'),            action: () => doInsert('[link text](url)', 1) },
+          { type: 'item', label: t('editor.menuMathBlock'), action: () => doInsert('$$\nE = mc^2\n$$', 3) },
+          { type: 'item', label: t('editor.menuSpeakerNotes'),   action: () => doInsert('\n\n???\n\n', 7) },
+          { type: 'item', label: t('editor.menuReference'),       action: () => doInsert('!ref[]', 5) },
           {
             type: 'item',
-            label: 'Table of Contents',
+            label: t('editor.menuTableOfContents'),
             action: () => doInsert('## Agenda\n\n!toc\n', 3),
           },
         ],
       },
       { type: 'divider' },
       {
-        type: 'submenu', label: 'Charts', entries: [
+        type: 'submenu', label: t('editor.menuCharts'), entries: [
           {
-            type: 'item', label: 'Pie Chart',
+            type: 'item', label: t('editor.menuPieChart'),
             action: () => doInsert(
               '\n```mermaid\npie title Distribution\n    "Category A" : 40\n    "Category B" : 35\n    "Category C" : 25\n```\n',
               22,  // lands on "Distribution"
             ),
           },
           {
-            type: 'item', label: 'Bar Chart',
+            type: 'item', label: t('editor.menuBarChart'),
             action: () => doInsert(
               '\n```mermaid\nxychart-beta\n    title "Sales by Quarter"\n    x-axis [Q1, Q2, Q3, Q4]\n    y-axis 0 --> 100\n    bar [40, 65, 55, 80]\n```\n',
               36,  // lands on "Sales by Quarter"
             ),
           },
           {
-            type: 'item', label: 'Line Chart',
+            type: 'item', label: t('editor.menuLineChart'),
             action: () => doInsert(
               '\n```mermaid\nxychart-beta\n    title "Trend Over Time"\n    x-axis [Jan, Feb, Mar, Apr, May]\n    y-axis 0 --> 100\n    line [30, 45, 60, 55, 75]\n```\n',
               36,  // lands on "Trend Over Time"
@@ -1289,30 +1291,30 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
         ],
       },
       {
-        type: 'submenu', label: 'Diagrams', entries: [
+        type: 'submenu', label: t('editor.menuDiagrams'), entries: [
           {
-            type: 'item', label: 'Progress Bars',
+            type: 'item', label: t('editor.menuProgressBars'),
             action: () => doInsert(
               '\n!progress[Task Complete](75)\n!progress[In Progress](40)\n!progress[Planned](10)\n',
               11,  // lands on "Task Complete"
             ),
           },
           {
-            type: 'item', label: 'Flowchart',
+            type: 'item', label: t('editor.menuFlowchart'),
             action: () => doInsert(
               '\n```mermaid\nflowchart TD\n    A([Start]) --> B[Process Step]\n    B --> C{Decision?}\n    C -- Yes --> D([End])\n    C -- No --> B\n```\n',
               46,  // lands on "Process Step"
             ),
           },
           {
-            type: 'item', label: 'Timeline',
+            type: 'item', label: t('editor.menuTimeline'),
             action: () => doInsert(
               '\n```mermaid\ntimeline\n    title Company Milestones\n    2022 : Founded\n         : Seed Funding\n    2023 : Product Launch\n         : 1K Users\n    2024 : Series A\n         : 10K Users\n```\n',
               31,  // lands on "Company Milestones"
             ),
           },
           {
-            type: 'item', label: 'Sequence Diagram',
+            type: 'item', label: t('editor.menuSequenceDiagram'),
             action: () => doInsert(
               '\n```mermaid\nsequenceDiagram\n    participant U as User\n    participant A as App\n    participant D as Database\n    U->>A: Login Request\n    A->>D: Verify Credentials\n    D-->>A: User Found\n    A-->>U: Access Granted\n```\n',
               49,  // lands on "User"
@@ -1327,7 +1329,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
     <>
     <div className="editor-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="panel-header">
-        Editor
+        {t('layout.editorPanelHeader')}
       </div>
       <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
         <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} onContextMenu={handleContextMenu} />
@@ -1338,7 +1340,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             background: 'rgba(217,79,0,0.06)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <span style={{ color: '#D94F00', fontSize: 13, fontWeight: 500 }}>Drop image to insert</span>
+            <span style={{ color: '#D94F00', fontSize: 13, fontWeight: 500 }}>{t('editor.dropImageHint')}</span>
           </div>
         )}
         {!content && (
@@ -1348,9 +1350,9 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             gap: 10, color: 'var(--text-dim)', fontSize: 13, pointerEvents: 'none', userSelect: 'none',
           }}>
             <span style={{ fontSize: 28, opacity: 0.3 }}>📄</span>
-            <span>{mod}+N — new presentation</span>
-            <span>{mod}+O — open file</span>
-            <span>Right-click → Insert → Table of Contents</span>
+            <span>{t('editor.newPresentationHint', { mod })}</span>
+            <span>{t('editor.openFileHint', { mod })}</span>
+            <span>{t('editor.tocHint')}</span>
           </div>
         )}
       </div>
@@ -1382,7 +1384,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             {confirmState.message}
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button className="btn" onClick={() => { confirmState.resolve(false); setConfirmState(null); }}>Cancel</button>
+            <button className="btn" onClick={() => { confirmState.resolve(false); setConfirmState(null); }}>{t('common.cancel')}</button>
             <button className="btn btn-primary" onClick={() => { confirmState.resolve(true); setConfirmState(null); }}>
               {confirmState.okLabel}
             </button>
@@ -1405,11 +1407,11 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
           onMouseDown={e => e.stopPropagation()}
         >
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-            Insert Table
+            {t('editor.insertTableTitle')}
           </div>
           <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
             <label style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Columns</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>{t('editor.insertTableColumns')}</div>
               <input
                 type="number" min={1} max={20} value={tableCols}
                 onChange={e => setTableCols(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
@@ -1426,7 +1428,7 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
               />
             </label>
             <label style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>Rows</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>{t('editor.insertTableRows')}</div>
               <input
                 type="number" min={2} max={50} value={tableRows}
                 onChange={e => setTableRows(Math.max(2, Math.min(50, parseInt(e.target.value) || 2)))}
@@ -1443,9 +1445,9 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
             </label>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <button className="btn" onClick={() => setTablePromptOpen(false)}>Cancel</button>
+            <button className="btn" onClick={() => setTablePromptOpen(false)}>{t('common.cancel')}</button>
             <button className="btn btn-primary" onClick={() => { insertTable(tableRows, tableCols); setTablePromptOpen(false); }}>
-              Insert
+              {t('editor.insertTableAction')}
             </button>
           </div>
         </div>

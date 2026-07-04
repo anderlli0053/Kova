@@ -7,6 +7,7 @@ import { isFontAvailable } from '../engine/fontDetect';
 import { fetchUpdate, canSelfUpdate, restartApp } from '../engine/updater';
 import type { AvailableUpdate } from '../engine/updater';
 import { APP_VERSION } from '../version';
+import { UI_LOCALE_OPTIONS, useT } from '../i18n';
 import {
   LANGUAGE_OPTIONS,
   getCustomWords,
@@ -145,6 +146,7 @@ interface Props {
 }
 
 export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, scrollToUpdates, onChange, onUpdateChecked, onClose }: Props) {
+  const t = useT();
   const set = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     onChange({ ...settings, [key]: value });
 
@@ -269,7 +271,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>Settings</h2>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>{t('modals.settingsTitle')}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -286,15 +288,15 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         {/* Appearance */}
-        <Section label="Appearance" />
+        <Section label={t('settings.sectionAppearance')} />
 
         <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>App theme</div>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>{t('settings.appTheme')}</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {([
-              { value: 'auto',  label: 'Auto'  },
-              { value: 'dark',  label: 'Dark'  },
-              { value: 'light', label: 'Light' },
+              { value: 'auto',  label: t('settings.themeAuto')  },
+              { value: 'dark',  label: t('settings.themeDark')  },
+              { value: 'light', label: t('settings.themeLight') },
             ] as const).map(({ value, label }) => (
               <button key={value} type="button" onClick={() => set('uiTheme', value)}
                 style={groupBtnStyle(settings.uiTheme === value)}
@@ -305,13 +307,43 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
           </div>
           {settings.uiTheme === 'auto' && (
             <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>
-              Follows your operating system's appearance setting.
+              {t('settings.themeAutoDescription')}
             </div>
           )}
         </div>
 
         <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>Interface scale</div>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>{t('settings.displayLanguage')}</div>
+          <div style={{ position: 'relative' }}>
+            <select
+              value={settings.locale}
+              onChange={(e) => set('locale', e.target.value)}
+              style={{
+                width: '100%',
+                padding: '6px 28px 6px 10px',
+                fontSize: 12,
+                borderRadius: 4,
+                border: '1px solid var(--border-alt)',
+                background: 'var(--bg-input)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                outline: 'none',
+              }}
+            >
+              {UI_LOCALE_OPTIONS.map(({ code, label }) => (
+                <option key={code} value={code}>{label}</option>
+              ))}
+            </select>
+            <svg viewBox="0 0 10 6" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 10, height: 6, pointerEvents: 'none', color: 'var(--text-dim)' }}>
+              <path d="M0 0l5 6 5-6z" fill="currentColor" />
+            </svg>
+          </div>
+        </div>
+
+        <div style={{ padding: '10px 0' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>{t('settings.interfaceScale')}</div>
           <div style={{ position: 'relative' }}>
             <select
               value={Math.round(settings.uiScale * 100)}
@@ -341,7 +373,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>Editor font</div>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>{t('settings.editorFont')}</div>
           <div style={{ position: 'relative' }}>
             <select
               value={settings.editorFont}
@@ -378,21 +410,21 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         <Row
-          label="Show frontmatter YAML in editor"
-          description="Displays the YAML frontmatter block at the top of the editor so it can be edited directly alongside the slides."
+          label={t('settings.showFrontmatter')}
+          description={t('settings.showFrontmatterDescription')}
           control={<Toggle checked={settings.showFrontmatter} onChange={(v) => set('showFrontmatter', v)} />}
         />
 
         <Row
-          label="Word wrap"
-          description="Wrap long lines in the editor. When off, a horizontal scrollbar appears for lines wider than the panel."
+          label={t('settings.wordWrap')}
+          description={t('settings.wordWrapDescription')}
           control={<Toggle checked={settings.editorWordWrap} onChange={(v) => set('editorWordWrap', v)} />}
         />
 
         <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>Default presentation theme</div>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 8 }}>{t('settings.defaultTheme')}</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>
-            Applied when creating a new presentation.
+            {t('settings.defaultThemeDescription')}
           </div>
           <div style={{ position: 'relative' }}>
             <select
@@ -429,18 +461,18 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         {/* Language & Spelling */}
-        <Section label="Language &amp; Spelling" />
+        <Section label={t('settings.sectionLanguageSpelling')} />
 
         <Row
-          label="Check spelling while typing"
-          description="Underlines misspelled words in red. Dictionary is loaded on first use."
+          label={t('settings.checkSpelling')}
+          description={t('settings.checkSpellingDescription')}
           control={<Toggle checked={settings.spellCheckEnabled} onChange={(v) => set('spellCheckEnabled', v)} />}
         />
 
         {settings.spellCheckEnabled && (
           <>
             <div style={{ paddingBottom: 10 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-label)', marginBottom: 8 }}>Dictionary language</div>
+              <div style={{ fontSize: 11, color: 'var(--text-label)', marginBottom: 8 }}>{t('settings.dictionaryLanguage')}</div>
               <div style={{ position: 'relative' }}>
                 <select
                   value={settings.spellCheckLanguage}
@@ -478,7 +510,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
             <div style={{ paddingBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: customWordList.length > 0 && showCustomWords ? 8 : 0 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-label)' }}>
-                  Learned words ({getCustomWordCount()})
+                  {t('settings.learnedWords', { count: getCustomWordCount() })}
                 </div>
                 {customWordList.length > 0 && (
                   <button
@@ -490,11 +522,11 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
                       color: 'var(--text-secondary)',
                     }}
                   >
-                    {showCustomWords ? 'Hide' : 'Manage'}
+                    {showCustomWords ? t('common.hide') : t('settings.learnedWordsManage')}
                   </button>
                 )}
                 {customWordList.length === 0 && (
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>None yet</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t('settings.learnedWordsNone')}</span>
                 )}
               </div>
 
@@ -520,7 +552,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
                           background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px',
                           color: 'var(--text-dim)', fontSize: 14, lineHeight: 1,
                         }}
-                        title="Remove from dictionary"
+                        title={t('settings.removeFromDictionary')}
                       >
                         ×
                       </button>
@@ -533,17 +565,17 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         )}
 
         {/* Saving */}
-        <Section label="Saving" />
+        <Section label={t('settings.sectionSaving')} />
 
         <Row
-          label="Autosave"
-          description="Automatically save your file at regular intervals. Only applies after your first manual save."
+          label={t('settings.autosave')}
+          description={t('settings.autosaveDescription')}
           control={<Toggle checked={settings.autosave} onChange={(v) => set('autosave', v)} />}
         />
 
         {settings.autosave && (
           <div style={{ paddingBottom: 6 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-label)', marginBottom: 8 }}>Save every</div>
+            <div style={{ fontSize: 11, color: 'var(--text-label)', marginBottom: 8 }}>{t('settings.saveEvery')}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               {INTERVAL_OPTIONS.map(({ label, value }) => (
                 <button
@@ -560,23 +592,23 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         )}
 
         {/* Workspace */}
-        <Section label="Workspace" />
+        <Section label={t('settings.sectionWorkspace')} />
 
         <Row
-          label="Confirm before closing"
-          description="Ask for confirmation when closing a file with unsaved changes."
+          label={t('settings.confirmBeforeClosing')}
+          description={t('settings.confirmBeforeClosingDescription')}
           control={<Toggle checked={settings.confirmOnClose} onChange={(v) => set('confirmOnClose', v)} />}
         />
 
         <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>On startup</div>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>{t('settings.onStartup')}</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-            Window size and position are always restored. This controls the document.
+            {t('settings.onStartupDescription')}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {([
-              { value: 'blank',      label: 'Blank document' },
-              { value: 'reopenLast', label: 'Reopen last file' },
+              { value: 'blank',      label: t('settings.startupBlank') },
+              { value: 'reopenLast', label: t('settings.startupReopenLast') },
             ] as { value: StartupBehavior; label: string }[]).map(({ value, label }) => (
               <button key={value} type="button" onClick={() => set('startupBehavior', value)}
                 style={groupBtnStyle(settings.startupBehavior === value)}
@@ -586,14 +618,14 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>PDF page size</div>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>{t('settings.pdfPageSize')}</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-            Paper size for PDF export. Pages are laid out landscape.
+            {t('settings.pdfPageSizeDescription')}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {([
-              { value: 'a4',     label: 'A4'     },
-              { value: 'letter', label: 'Letter' },
+              { value: 'a4',     label: t('settings.pageSizeA4')     },
+              { value: 'letter', label: t('settings.pageSizeLetter') },
             ] as { value: AppSettings['pdfPageSize']; label: string }[]).map(({ value, label }) => (
               <button key={value} type="button" onClick={() => set('pdfPageSize', value)}
                 style={groupBtnStyle(settings.pdfPageSize === value)}
@@ -603,19 +635,19 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         {/* Presentation */}
-        <Section label="Presentation" />
+        <Section label={t('settings.sectionPresentation')} />
 
         <div style={{ padding: '10px 0' }}>
-          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>Display mode</div>
+          <div style={{ fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>{t('settings.displayMode')}</div>
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-            Auto detects connected displays at presentation time — dual presenter view if a second screen is found, single screen otherwise. Mirror shows the same slide on both displays.
+            {t('settings.displayModeDescription')}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {([
-              { value: 'auto',   label: 'Auto'          },
-              { value: 'single', label: 'Single screen' },
-              { value: 'dual',   label: 'Dual screen'   },
-              { value: 'mirror', label: 'Mirror'        },
+              { value: 'auto',   label: t('settings.displayModeAuto')   },
+              { value: 'single', label: t('settings.displayModeSingle') },
+              { value: 'dual',   label: t('settings.displayModeDual')   },
+              { value: 'mirror', label: t('settings.displayModeMirror') },
             ] as { value: PresentationMode; label: string }[]).map(({ value, label }) => (
               <button key={value} type="button" onClick={() => set('presentationMode', value)}
                 style={groupBtnStyle(settings.presentationMode === value)}
@@ -625,7 +657,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         <Row
-          label="Laser pointer colour"
+          label={t('settings.laserPointerColour')}
           control={
             <div style={{ display: 'flex', gap: 8 }}>
               {LASER_COLOR_OPTIONS.map(({ value, label }) => (
@@ -654,22 +686,22 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         {settings.presentationMode === 'dual' && (
           <>
             <Row
-              label="Show next slide preview"
-              description="Displays a preview of the upcoming slide in the presenter view."
+              label={t('settings.showNextSlidePreview')}
+              description={t('settings.showNextSlidePreviewDescription')}
               control={<Toggle checked={settings.presenterShowNextSlide} onChange={(v) => set('presenterShowNextSlide', v)} />}
             />
             <Row
-              label="Show elapsed timer"
-              description="Displays a running clock from the moment the presentation starts."
+              label={t('settings.showElapsedTimer')}
+              description={t('settings.showElapsedTimerDescription')}
               control={<Toggle checked={settings.presenterShowTimer} onChange={(v) => set('presenterShowTimer', v)} />}
             />
             <div style={{ padding: '6px 0 10px' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>Notes font size</div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 8 }}>{t('settings.notesFontSize')}</div>
               <div style={{ display: 'flex', gap: 6 }}>
                 {([
-                  { value: 'sm', label: 'Small'  },
-                  { value: 'md', label: 'Medium' },
-                  { value: 'lg', label: 'Large'  },
+                  { value: 'sm', label: t('settings.fontSizeSmall')  },
+                  { value: 'md', label: t('settings.fontSizeMedium') },
+                  { value: 'lg', label: t('settings.fontSizeLarge')  },
                 ] as { value: NotesFontSize; label: string }[]).map(({ value, label }) => (
                   <button key={value} type="button" onClick={() => set('presenterNotesFontSize', value)}
                     style={groupBtnStyle(settings.presenterNotesFontSize === value)}
@@ -682,17 +714,17 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
 
         {/* Updates */}
         <div ref={updatesRef}>
-        <Section label="Updates" />
+        <Section label={t('settings.sectionUpdates')} />
 
         {selfUpdateSupported ? (
           <Row
-            label="Check for updates on launch"
-            description="Fetches the latest release tag from github.com/KovaMD/Kova on startup. No personal data is sent."
+            label={t('settings.checkForUpdates')}
+            description={t('settings.checkForUpdatesDescription')}
             control={<Toggle checked={settings.checkForUpdates} onChange={(v) => set('checkForUpdates', v)} />}
           />
         ) : (
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.6, padding: '10px 0' }}>
-            Updates for this installation are managed by your distribution's package manager.
+            {t('settings.updatesManagedByDistro')}
           </div>
         )}
 
@@ -711,7 +743,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
                 cursor: 'pointer',
               }}
             >
-              Check now
+              {t('settings.checkNow')}
             </button>
           )}
 
@@ -729,21 +761,21 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
                 cursor: 'default',
               }}
             >
-              Checking…
+              {t('settings.checking')}
             </button>
           )}
 
           {updateState === 'up-to-date' && (
-            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>Up to date (v{APP_VERSION})</span>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t('settings.upToDate', { version: APP_VERSION })}</span>
           )}
 
           {updateState === 'error' && (
-            <span style={{ fontSize: 11, color: '#c0392b' }}>Could not reach update server</span>
+            <span style={{ fontSize: 11, color: '#c0392b' }}>{t('settings.updateCheckError')}</span>
           )}
 
           {typeof updateState === 'object' && updateState.phase === 'available' && (
             <>
-              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{updateState.version} available</span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t('settings.updateAvailable', { version: updateState.version })}</span>
               <button
                 type="button"
                 onClick={runInstall}
@@ -758,7 +790,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
                   fontWeight: 500,
                 }}
               >
-                Update Now
+                {t('settings.updateNow')}
               </button>
             </>
           )}
@@ -766,7 +798,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
           {typeof updateState === 'object' && updateState.phase === 'downloading' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                Downloading {updateState.version}{updateState.pct !== null ? ` — ${updateState.pct}%` : '…'}
+                {t('settings.downloading', { version: updateState.version, pct: updateState.pct !== null ? ` — ${updateState.pct}%` : '…' })}
               </span>
               {updateState.pct !== null && (
                 <div style={{ width: 80, height: 3, background: 'var(--border)', borderRadius: 2 }}>
@@ -785,12 +817,12 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
           {typeof updateState === 'object' && updateState.phase === 'done' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 11, color: 'var(--accent)' }}>
-                {updateState.version} installed
+                {t('settings.updateInstalled', { version: updateState.version })}
               </span>
               <button
                 type="button"
                 onClick={() => {
-                  if (isDirty && !window.confirm('You have unsaved changes. Restart anyway?')) return;
+                  if (isDirty && !window.confirm(t('settings.restartConfirm'))) return;
                   restartApp();
                 }}
                 style={{
@@ -804,7 +836,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
                   fontFamily: 'inherit',
                 }}
               >
-                Restart now
+                {t('settings.restartNow')}
               </button>
             </div>
           )}
@@ -812,13 +844,13 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
         </div>
 
         {/* About */}
-        <Section label="About" />
+        <Section label={t('settings.sectionAbout')} />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Kova</div>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>
-              Free and open source · GNU General Public License v3
+              {t('settings.aboutLicense')}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -835,7 +867,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
                 cursor: 'pointer',
               }}
             >
-              {showLicenses ? 'Hide licenses' : 'Licenses'}
+              {showLicenses ? t('settings.hideLicenses') : t('settings.showLicenses')}
             </button>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>
               v{APP_VERSION}

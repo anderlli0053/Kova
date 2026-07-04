@@ -5,6 +5,7 @@ import type { Theme } from '../../engine/theme';
 import type { NotesFontSize } from '../../store/settings';
 import { SlideRenderer } from '../preview/SlideRenderer';
 import { SLIDE_W, formatTime, ScaledSlideBox, LaserDot } from './presentationShared';
+import { useT } from '../../i18n';
 import './PresenterOverlay.css';
 
 interface Props {
@@ -32,6 +33,7 @@ export function PresenterOverlay({
   slides, currentIndex, theme, docTitle, docDate, aspectRatio,
   showNextSlide, showTimer, notesFontSize, laserColor = '#ff2020', onNavigate, onExit,
 }: Props) {
+  const t = useT();
   const slide     = slides[currentIndex];
   const nextSlide = slides[currentIndex + 1] ?? null;
   const total     = slides.length;
@@ -267,7 +269,7 @@ export function PresenterOverlay({
                 <span style={{
                   color: blankMode === 'black' ? '#aaa' : '#444',
                   fontSize: 13, fontWeight: 500,
-                }}>Audience screen is blank</span>
+                }}>{t('presentation.audienceBlank')}</span>
               </div>
             )}
           </div>
@@ -283,7 +285,7 @@ export function PresenterOverlay({
           {showNextSlide && (
             <div className="pres-presenter__next">
               <div className="pres-presenter__next-label">
-                {nextSlide ? 'Next' : 'End of presentation'}
+                {nextSlide ? t('presentation.next') : t('presentation.endOfPresentation')}
               </div>
               {nextSlide && (
                 <div className="pres-presenter__next-frame" ref={nextFrameRef}>
@@ -305,20 +307,20 @@ export function PresenterOverlay({
           {/* Speaker notes */}
           <div className="pres-presenter__notes">
             <div className="pres-presenter__notes-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              Speaker notes
+              {t('presentation.speakerNotes')}
               <button
                 className={`pres-presenter__btn${showNotes ? '' : ' pres-presenter__btn--active'}`}
                 onClick={() => setShowNotes((p) => !p)}
-                title="Toggle notes (N)"
+                title={t('presentation.toggleNotesShort')}
                 style={{ fontSize: 10, padding: '2px 6px' }}
-              >{showNotes ? 'Hide' : 'Show'}</button>
+              >{showNotes ? t('common.hide') : t('common.show')}</button>
             </div>
             {showNotes && (slide.speakerNotes ? (
               <p className={`pres-presenter__notes-text pres-presenter__notes-text--${notesFontSize}`}>
                 {slide.speakerNotes}
               </p>
             ) : (
-              <span className="pres-presenter__notes-empty">No notes for this slide</span>
+              <span className="pres-presenter__notes-empty">{t('presentation.noNotesForSlide')}</span>
             ))}
           </div>
 
@@ -332,7 +334,7 @@ export function PresenterOverlay({
             className="pres-presenter__btn"
             onClick={goPrev}
             disabled={currentIndex === 0}
-            title="Previous (←)"
+            title={t('presentation.previousSlide')}
           >‹</button>
           {jumpInput !== null ? (
             <input
@@ -358,21 +360,21 @@ export function PresenterOverlay({
             <span
               className="pres-presenter__counter"
               onClick={() => setJumpInput(String(currentIndex + 1))}
-              title="Click to jump to slide"
+              title={t('presentation.jumpToSlide')}
             >{currentIndex + 1} / {total}</span>
           )}
           <button
             className="pres-presenter__btn"
             onClick={goNext}
             disabled={currentIndex === total - 1}
-            title="Next (→ / Space)"
+            title={t('presentation.nextSlide')}
           >›</button>
         </div>
 
         {showTimer && (
           <>
             <div className="pres-presenter__hud-divider" />
-            <span className="pres-presenter__timer" title="Elapsed time">
+            <span className="pres-presenter__timer" title={t('presentation.elapsedTime')}>
               {formatTime(elapsed)}
             </span>
           </>
@@ -383,16 +385,16 @@ export function PresenterOverlay({
         <button
           className={`pres-presenter__btn${laserActive ? ' pres-presenter__btn--active' : ''}`}
           onClick={() => setLaserActive((p) => !p)}
-          title="Toggle laser pointer (L)"
-        >Laser</button>
+          title={t('presentation.toggleLaser')}
+        >{t('presentation.laserButton')}</button>
 
         <div className="pres-presenter__hud-divider" />
 
         <button
           className="pres-presenter__btn pres-presenter__btn--exit"
           onClick={onExit}
-          title="Exit presentation (Esc)"
-        >✕ Exit</button>
+          title={t('presentation.exitPresentation')}
+        >{t('presentation.exitButtonWord')}</button>
       </div>
     </div>
   );

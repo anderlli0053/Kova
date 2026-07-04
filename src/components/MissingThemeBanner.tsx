@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useT } from '../i18n';
 
 // Fetch the registry from GitHub, not the CDN, so the SHA-256 hashes come from
 // an independent source — matches the same URL used by ThemeLibraryModal.
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function MissingThemeBanner({ themeId, onInstalled, onDismiss }: Props) {
+  const t = useT();
   const [registryTheme, setRegistryTheme] = useState<RemoteTheme | null | 'checking'>('checking');
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,22 +39,22 @@ export function MissingThemeBanner({ themeId, onInstalled, onDismiss }: Props) {
   async function handleInstall() {
     const theme = registryTheme as RemoteTheme;
     if (!theme?.sha256) {
-      setError('Theme is missing its integrity hash');
+      setError(t('modals.missingThemeIntegrityError'));
       return;
     }
     setInstalling(true);
     setError(null);
     try {
       const res = await fetch(THEME_URL(themeId));
-      if (!res.ok) throw new Error('Download failed');
+      if (!res.ok) throw new Error(t('modals.missingThemeDownloadFailed'));
       const buffer = await res.arrayBuffer();
       const digest = await crypto.subtle.digest('SHA-256', buffer);
       const hex = Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
-      if (hex !== theme.sha256) throw new Error('Integrity check failed');
+      if (hex !== theme.sha256) throw new Error(t('modals.missingThemeIntegrityFailed'));
       await invoke('save_theme', { id: themeId, yaml: new TextDecoder().decode(buffer) });
       onInstalled(themeId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Install failed');
+      setError(err instanceof Error ? err.message : t('modals.missingThemeInstallFailed'));
       setInstalling(false);
     }
   }
@@ -89,10 +91,10 @@ export function MissingThemeBanner({ themeId, onInstalled, onDismiss }: Props) {
 
       <span style={{ flex: 1 }}>
         {registryTheme === 'checking'
-          ? <>Checking for theme <strong style={{ color: 'var(--text-primary)' }}>{themeId}</strong>…</>
+          ? <>{t('modals.missingThemeCheckingPrefix')} <strong style={{ color: 'var(--text-primary)' }}>{themeId}</strong>{t('modals.missingThemeCheckingSuffix')}</>
           : registryTheme !== null
-            ? <>This file uses theme <strong style={{ color: 'var(--text-primary)' }}>{themeName}</strong> which isn't installed{error ? `: ${error}` : '.'}</>
-            : <>This file uses theme <strong style={{ color: 'var(--text-primary)' }}>{themeId}</strong> which isn't in the Theme Library.</>
+            ? <>{t('modals.missingThemeUsesThemePrefix')} <strong style={{ color: 'var(--text-primary)' }}>{themeName}</strong> {t('modals.missingThemeNotInstalledSuffix')}{error ? `: ${error}` : '.'}</>
+            : <>{t('modals.missingThemeUsesThemePrefix')} <strong style={{ color: 'var(--text-primary)' }}>{themeId}</strong> {t('modals.missingThemeNotInLibrarySuffix')}</>
         }
       </span>
 
@@ -113,14 +115,14 @@ export function MissingThemeBanner({ themeId, onInstalled, onDismiss }: Props) {
             fontWeight: 500,
           }}
         >
-          {installing ? 'Installing…' : error ? 'Retry' : 'Install'}
+          {installing ? t('common.installing') : error ? t('common.retry') : t('common.install')}
         </button>
       )}
 
       <button
         type="button"
         onClick={onDismiss}
-        title="Dismiss"
+        title={t('common.dismiss')}
         style={{
           flexShrink: 0,
           background: 'none',

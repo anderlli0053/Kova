@@ -3,6 +3,7 @@ import type { Slide, AspectRatio } from '../../engine/types';
 import type { Theme } from '../../engine/theme';
 import { DEFAULT_THEME } from '../../engine/theme';
 import { SlideRenderer } from '../preview/SlideRenderer';
+import { useT } from '../../i18n';
 
 interface Props {
   slides: Slide[];
@@ -22,6 +23,7 @@ const SLIDE_W = 960;
 const THUMB_W = 140;
 
 export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onDuplicate, onToggleHidden, onDelete, theme = DEFAULT_THEME, docTitle, docDate, aspectRatio = { w: 16, h: 9 } }: Props) {
+  const t = useT();
   const slideH = Math.round(SLIDE_W * aspectRatio.h / aspectRatio.w);
 
   // Observe the outer panel div (no overflow) so a scrollbar appearing in the
@@ -194,11 +196,11 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onDu
 
   return (
     <div ref={panelRef} style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-app)' }}>
-      <div className="panel-header">Slides</div>
+      <div className="panel-header">{t('layout.slidesPanelHeader')}</div>
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 6px' }}>
         {slides.length === 0 ? (
           <div style={{ color: 'var(--text-dim)', fontSize: 11, textAlign: 'center', marginTop: 24, padding: '0 8px' }}>
-            Open a Markdown file to see slides
+            {t('layout.openFileHint')}
           </div>
         ) : (
           slides.map((slide, i) => {
@@ -240,7 +242,7 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onDu
         // logic only if users actually hit it.
         <div
           role="menu"
-          aria-label="Slide options"
+          aria-label={t('layout.slideOptionsAriaLabel')}
           onMouseDown={(e) => e.stopPropagation()}
           style={{
             position: 'fixed', left: menu.x, top: menu.y, zIndex: 1000,
@@ -250,28 +252,28 @@ export function ThumbnailPanel({ slides, currentIndex, onSelect, onReorder, onDu
           }}
         >
           <MenuItem
-            label="Move up"
+            label={t('layout.moveUp')}
             disabled={!onReorder || menu.index === 0}
             onClick={() => { onReorder?.(menu.index, menu.index - 1); setMenu(null); }}
           />
           <MenuItem
-            label="Move down"
+            label={t('layout.moveDown')}
             disabled={!onReorder || menu.index === slides.length - 1}
             onClick={() => { onReorder?.(menu.index, menu.index + 1); setMenu(null); }}
           />
           <MenuItem
-            label="Duplicate slide"
+            label={t('layout.duplicateSlide')}
             disabled={!onDuplicate}
             onClick={() => { onDuplicate?.(menu.index); setMenu(null); }}
           />
           <MenuItem
-            label={slides[menu.index]?.hidden ? 'Show slide' : 'Hide slide'}
+            label={slides[menu.index]?.hidden ? t('layout.showSlide') : t('layout.hideSlide')}
             disabled={!onToggleHidden}
             onClick={() => { onToggleHidden?.(menu.index); setMenu(null); }}
           />
           <div role="separator" style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
           <MenuItem
-            label="Delete slide"
+            label={t('layout.deleteSlide')}
             disabled={!onDelete || slides.length <= 1}
             onClick={() => { onDelete?.(menu.index); setMenu(null); }}
           />
@@ -341,6 +343,7 @@ interface ThumbnailProps {
 // references (bound internally below) rather than passed as pre-bound
 // closures, specifically so they don't defeat this memoization.
 const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive, isDragSource, isDragging, canDrag, isHidden, onSelect, onToggleHidden, onDragStart, onContextMenu, theme, docTitle, docDate, slideH, scale, thumbH }: ThumbnailProps) {
+  const t = useT();
   const thumbRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -368,7 +371,7 @@ const Thumbnail = memo(function Thumbnail({ slide, index, totalSlides, isActive,
     >
       {onToggleHidden && (
         <button
-          title={isHidden ? 'Show slide in presentation/export' : 'Hide slide from presentation/export'}
+          title={isHidden ? t('layout.showSlideTitle') : t('layout.hideSlideTitle')}
           onClick={(e) => { e.stopPropagation(); onToggleHidden(index); }}
           onMouseDown={(e) => e.stopPropagation()}
           style={{

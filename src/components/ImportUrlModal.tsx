@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useT } from '../i18n';
 
 interface ImportUrlModalProps {
   onImported: (text: string) => void;
@@ -35,6 +36,7 @@ function toRawUrl(input: string): string {
 }
 
 export function ImportUrlModal({ onImported, onClose }: ImportUrlModalProps) {
+  const t = useT();
   const [url, setUrl]         = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
@@ -79,11 +81,10 @@ export function ImportUrlModal({ onImported, onClose }: ImportUrlModalProps) {
         display: 'flex', flexDirection: 'column', gap: 12,
       }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)' }}>
-          Import from URL
+          {t('modals.importUrlTitle')}
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-          Paste a link to a Markdown file. GitHub, GitLab, and Bitbucket links are
-          converted to raw automatically.
+          {t('modals.importUrlDescription')}
         </div>
         <input
           ref={inputRef}
@@ -91,7 +92,7 @@ export function ImportUrlModal({ onImported, onClose }: ImportUrlModalProps) {
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="https://github.com/user/repo/blob/main/file.md"
+          placeholder={t('modals.importUrlPlaceholder')}
           style={{
             width: '100%', boxSizing: 'border-box',
             padding: '6px 10px', borderRadius: 4,
@@ -102,7 +103,7 @@ export function ImportUrlModal({ onImported, onClose }: ImportUrlModalProps) {
         />
         {willRewrite && (
           <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4, wordBreak: 'break-all' }}>
-            Fetching raw: {resolvedUrl}
+            {t('modals.importUrlFetchingRaw', { url: resolvedUrl })}
           </div>
         )}
         {error && (
@@ -112,14 +113,14 @@ export function ImportUrlModal({ onImported, onClose }: ImportUrlModalProps) {
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
           <button className="btn" onClick={onClose} disabled={loading}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             className="btn btn--primary"
             onClick={handleImport}
             disabled={!url.trim() || loading}
           >
-            {loading ? 'Fetching…' : 'Import'}
+            {loading ? t('modals.importUrlFetching') : t('modals.importUrlImport')}
           </button>
         </div>
       </div>

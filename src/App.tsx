@@ -29,6 +29,7 @@ import { buildMacMenu } from './macMenu';
 import type { MacMenuHandlers } from './macMenu';
 import { loadKeybindings, matchShortcut, getCombo, formatCombo, isMac } from './engine/keybindings';
 import type { Keybindings } from './engine/keybindings';
+import { I18nProvider, useT } from './i18n';
 
 import { parseDocument } from './engine/parser/markdownToSlides';
 import { extractFrontmatter, patchFrontmatter } from './engine/parser/frontmatter';
@@ -122,6 +123,7 @@ export default function App() {
   // separate from currentSlideIndex (which indexes the full editor deck).
   const [presentIndex, setPresentIndex]   = useState(0);
   const [settings, setSettings]           = useState<AppSettings>(loadSettings);
+  const t = useT();
   const [showSettings, setShowSettings]   = useState(false);
   const [settingsScrollToUpdates, setSettingsScrollToUpdates] = useState(false);
   const [showThemeLibrary, setShowThemeMarketplace] = useState(false);
@@ -1205,11 +1207,11 @@ export default function App() {
       const savePath = target.toLowerCase().endsWith('.pptx') ? target : `${target}.pptx`;
       await invoke('write_file_bytes', { path: savePath, data: base64 });
       if (warnings.length > 0) {
-        window.alert(`Export complete with ${warnings.length} warning(s):\n\n${warnings.join('\n')}`);
+        window.alert(t('app.exportCompleteWithWarnings', { count: warnings.length, warnings: warnings.join('\n') }));
       }
     } catch (err) {
       console.error('Export failed:', err);
-      window.alert(`PPTX export failed: ${String(err)}`);
+      window.alert(t('app.pptxExportFailed', { error: String(err) }));
     }
   }, [visibleSlides, frontmatter, activeTheme, filePath]);
 
@@ -1269,13 +1271,13 @@ export default function App() {
             const { base64, warnings } = await exportToPdf(elements, activeTheme, aspectRatio);
             await invoke('write_file_bytes', { path: savePath, data: base64 });
             window.alert(
-              `Used the basic PDF renderer (native export unavailable); handout/N-up/paper options were not applied.` +
+              t('app.pdfExportFallback') +
               (warnings.length ? `\n\n${warnings.join('\n')}` : ''),
             );
           }
         } catch (err) {
           console.error('PDF export failed:', err);
-          window.alert(`PDF export failed:\n${String(err)}`);
+          window.alert(t('app.pdfExportFailed', { error: String(err) }));
         } finally {
           setPdfExportContext(null);
           pdfSlideRefs.current.clear();
@@ -1314,7 +1316,7 @@ export default function App() {
           await invoke('write_file', { path: savePath, content: html });
         } catch (err) {
           console.error('HTML export failed:', err);
-          window.alert(`HTML export failed:\n${String(err)}`);
+          window.alert(t('app.htmlExportFailed', { error: String(err) }));
         } finally {
           setPdfExportContext(null);
           pdfSlideRefs.current.clear();
@@ -1341,7 +1343,7 @@ export default function App() {
           ).filter((el): el is HTMLElement => Boolean(el));
           const { warnings } = await printPresentation(elements, activeTheme, aspectRatio);
           if (warnings.length > 0) {
-            window.alert(`Print complete with ${warnings.length} warning(s):\n\n${warnings.join('\n')}`);
+            window.alert(t('app.printCompleteWithWarnings', { count: warnings.length, warnings: warnings.join('\n') }));
           }
         } catch (err) {
           console.error('Print failed:', err);
@@ -1641,6 +1643,7 @@ export default function App() {
 
 
   return (
+    <I18nProvider locale={settings.locale}>
     <div className="app">
       {fileDragOver && !presentMode && !presenterMode && (
         <div style={{
@@ -1649,7 +1652,7 @@ export default function App() {
           background: 'rgba(217,79,0,0.06)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <span style={{ color: '#D94F00', fontSize: 14, fontWeight: 500 }}>Drop to open</span>
+          <span style={{ color: '#D94F00', fontSize: 14, fontWeight: 500 }}>{t('app.dropToOpen')}</span>
         </div>
       )}
       {presentMode && (
@@ -1689,15 +1692,15 @@ export default function App() {
         {isMac && <div className="mac-traffic-pad" data-tauri-drag-region />}
         {!isMac && <div className="btn-group" ref={fileMenuRef}>
           <button className="btn" onClick={() => setFileMenuOpen((o) => !o)}>
-            File
+            {t('app.menuFile')}
           </button>
           {fileMenuOpen && (
             <div className="btn-group-menu">
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setFileMenuOpen(false); handleNewFile(); }}>
-                New <span>{formatCombo(getCombo(keybindings.combos, 'newFile'))}</span>
+                {t('app.menuNew')} <span>{formatCombo(getCombo(keybindings.combos, 'newFile'))}</span>
               </button>
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setFileMenuOpen(false); handleOpenFile(); }}>
-                Open <span>{formatCombo(getCombo(keybindings.combos, 'openFile'))}</span>
+                {t('app.menuOpen')} <span>{formatCombo(getCombo(keybindings.combos, 'openFile'))}</span>
               </button>
               <div style={{ position: 'relative' }} onMouseEnter={() => setRecentSubmenuOpen(true)} onMouseLeave={() => setRecentSubmenuOpen(false)}>
                 <button
@@ -1707,12 +1710,12 @@ export default function App() {
                   onClick={() => setRecentSubmenuOpen((p) => !p)}
                   onKeyDown={(e) => { if (e.key === 'ArrowRight' || e.key === 'Enter') setRecentSubmenuOpen(true); }}
                 >
-                  Open Recent <span>›</span>
+                  {t('app.menuOpenRecent')} <span>›</span>
                 </button>
                 {recentSubmenuOpen && (
                   <div className="btn-group-menu btn-group-menu--sub">
                     {recents.length === 0 ? (
-                      <button className="btn-group-menu-item" disabled>No Recent Files</button>
+                      <button className="btn-group-menu-item" disabled>{t('app.menuNoRecentFiles')}</button>
                     ) : (
                       <>
                         {recents.map((p) => (
@@ -1730,7 +1733,7 @@ export default function App() {
                           className="btn-group-menu-item"
                           onClick={() => { setFileMenuOpen(false); menuHandlersRef.current.clearRecent(); }}
                         >
-                          Clear Menu
+                          {t('app.menuClearMenu')}
                         </button>
                       </>
                     )}
@@ -1745,31 +1748,31 @@ export default function App() {
                   onClick={() => setImportSubmenuOpen((p) => !p)}
                   onKeyDown={(e) => { if (e.key === 'ArrowRight' || e.key === 'Enter') setImportSubmenuOpen(true); }}
                 >
-                  Import <span>›</span>
+                  {t('app.menuImport')} <span>›</span>
                 </button>
                 {importSubmenuOpen && (
                   <div className="btn-group-menu btn-group-menu--sub">
                     <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImport(true)); }}>
-                      From PowerPoint…
+                      {t('app.menuImportFromPowerPoint')}
                     </button>
                     <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(() => setShowImportUrl(true)); }}>
-                      From URL…
+                      {t('app.menuImportFromUrl')}
                     </button>
                     <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); handleImportMarp(); }}>
-                      From Marp…
+                      {t('app.menuImportFromMarp')}
                     </button>
                   </div>
                 )}
               </div>
               <div className="btn-group-menu-separator" />
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" disabled={!filePath || !isDirty} onClick={() => { setFileMenuOpen(false); handleSave(); }}>
-                Save <span>{formatCombo(getCombo(keybindings.combos, 'save'))}</span>
+                {t('app.menuSave')} <span>{formatCombo(getCombo(keybindings.combos, 'save'))}</span>
               </button>
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" disabled={!content} onClick={() => { setFileMenuOpen(false); handleSaveAs(); }}>
-                Save As… <span>{formatCombo(getCombo(keybindings.combos, 'saveAs'))}</span>
+                {t('app.menuSaveAs')} <span>{formatCombo(getCombo(keybindings.combos, 'saveAs'))}</span>
               </button>
               <button className="btn-group-menu-item" disabled={!filePath} onClick={() => { setFileMenuOpen(false); handleCopyWithAssets(); }}>
-                Copy with Assets…
+                {t('app.menuCopyWithAssets')}
               </button>
               <div className="btn-group-menu-separator" />
               <div style={{ position: 'relative' }} onMouseEnter={() => setExportSubmenuOpen(true)} onMouseLeave={() => setExportSubmenuOpen(false)}>
@@ -1781,57 +1784,57 @@ export default function App() {
                   onClick={() => setExportSubmenuOpen((p) => !p)}
                   onKeyDown={(e) => { if (e.key === 'ArrowRight' || e.key === 'Enter') setExportSubmenuOpen(true); }}
                 >
-                  Export <span>›</span>
+                  {t('app.menuExport')} <span>›</span>
                 </button>
                 {exportSubmenuOpen && (
                   <div className="btn-group-menu btn-group-menu--sub">
                     <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExport(); }}>
-                      PowerPoint (.pptx)
+                      {t('app.menuExportPowerpoint')}
                     </button>
                     <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); setPdfPerPage(1); setPdfNotesOn(false); setPdfOptionsOpen(true); }}>
-                      {pdfExportContext ? 'Exporting PDF…' : 'PDF (.pdf)'}
+                      {pdfExportContext ? t('app.menuExportingPdf') : t('app.menuExportPdf')}
                     </button>
                     <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null} onClick={() => { setFileMenuOpen(false); handleExportHtml(); }}>
-                      {pdfExportContext ? 'Exporting…' : 'HTML (.html)'}
+                      {pdfExportContext ? t('app.menuExporting') : t('app.menuExportHtml')}
                     </button>
                   </div>
                 )}
               </div>
               <button className="btn-group-menu-item" disabled={slides.length === 0 || pdfExportContext !== null || printContext !== null} onClick={() => { setFileMenuOpen(false); handlePrint(); }}>
-                {printContext ? 'Preparing Print…' : 'Print…'}
+                {printContext ? t('app.menuPreparingPrint') : t('app.menuPrint')}
               </button>
               <div className="btn-group-menu-separator" />
               <button className="btn-group-menu-item" onClick={() => { setFileMenuOpen(false); guardDirty(actuallyCloseWindow); }}>
-                Exit
+                {t('app.menuExit')}
               </button>
             </div>
           )}
         </div>}
         {!isMac && <div className="btn-group" ref={editMenuRef}>
           <button className="btn" onClick={() => setEditMenuOpen((o) => !o)}>
-            Edit
+            {t('app.menuEdit')}
           </button>
           {editMenuOpen && (
             <div className="btn-group-menu">
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setEditMenuOpen(false); editorRef.current?.undo(); }}>
-                Undo <span>{formatCombo('ctrl+z')}</span>
+                {t('app.menuUndo')} <span>{formatCombo('ctrl+z')}</span>
               </button>
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setEditMenuOpen(false); editorRef.current?.redo(); }}>
-                Redo <span>{formatCombo(isMac ? 'meta+shift+z' : 'ctrl+y')}</span>
+                {t('app.menuRedo')} <span>{formatCombo(isMac ? 'meta+shift+z' : 'ctrl+y')}</span>
               </button>
               <div className="btn-group-menu-separator" />
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setEditMenuOpen(false); setTimeout(() => { editorRef.current?.focus(); document.execCommand('cut'); }, 0); }}>
-                Cut <span>{formatCombo('ctrl+x')}</span>
+                {t('app.menuCut')} <span>{formatCombo('ctrl+x')}</span>
               </button>
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setEditMenuOpen(false); setTimeout(() => { editorRef.current?.focus(); document.execCommand('copy'); }, 0); }}>
-                Copy <span>{formatCombo('ctrl+c')}</span>
+                {t('app.menuCopy')} <span>{formatCombo('ctrl+c')}</span>
               </button>
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setEditMenuOpen(false); setTimeout(() => { editorRef.current?.focus(); document.execCommand('paste'); }, 0); }}>
-                Paste <span>{formatCombo('ctrl+v')}</span>
+                {t('app.menuPaste')} <span>{formatCombo('ctrl+v')}</span>
               </button>
               <div className="btn-group-menu-separator" />
               <button className="btn-group-menu-item btn-group-menu-item--shortcut" onClick={() => { setEditMenuOpen(false); editorRef.current?.selectAll(); }}>
-                Select All <span>{formatCombo('ctrl+a')}</span>
+                {t('app.menuSelectAll')} <span>{formatCombo('ctrl+a')}</span>
               </button>
             </div>
           )}
@@ -1859,19 +1862,21 @@ export default function App() {
               setIsRenaming(true);
             }}
           >
-            {filePath ? filePath.split(/[\\/]/).pop() : 'Untitled.md'}{isDirty ? ' *' : ''}
+            {filePath ? filePath.split(/[\\/]/).pop() : t('app.untitledFilename')}{isDirty ? ' *' : ''}
           </div>
         )}
         <button
           className="btn btn-primary"
           onClick={handlePresentEnter}
           disabled={slides.length === 0}
-          title="Present from slide 1 (Alt+click to start from current slide)"
-        >▶ Present</button>
+          title={t('app.presentButtonTitle')}
+        >{t('app.presentButton')}</button>
         <button
           className="wm-btn"
           onClick={toggleFocusMode}
-          title={`${focusMode ? 'Exit' : 'Enter'} focus mode (${formatCombo(getCombo(keybindings.combos, 'focusMode'))})`}
+          title={focusMode
+            ? t('app.exitFocusMode', { combo: formatCombo(getCombo(keybindings.combos, 'focusMode')) })
+            : t('app.enterFocusMode', { combo: formatCombo(getCombo(keybindings.combos, 'focusMode')) })}
           style={{ marginLeft: 4, color: focusMode ? 'var(--accent)' : undefined }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -1884,7 +1889,7 @@ export default function App() {
         <button
           className={`wm-btn${showInspector ? ' wm-btn--active' : ''}`}
           onClick={() => setShowInspector((v) => !v)}
-          title="Toggle inspector"
+          title={t('app.toggleInspector')}
           style={{ marginLeft: 4 }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -1896,7 +1901,7 @@ export default function App() {
         <button
           className="wm-btn"
           onClick={() => setShowSettings(true)}
-          title="Settings"
+          title={t('app.settingsButtonTitle')}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/>
@@ -1908,14 +1913,14 @@ export default function App() {
             <button
               className="wm-btn"
               onMouseDown={(e) => { e.preventDefault(); getCurrentWindow().minimize(); }}
-              title="Minimise"
+              title={t('app.minimise')}
             >
               <svg width="12" height="2" viewBox="0 0 12 2"><rect width="12" height="2" rx="1" fill="currentColor"/></svg>
             </button>
             <button
               className="wm-btn"
               onMouseDown={(e) => { e.preventDefault(); getCurrentWindow().toggleMaximize(); }}
-              title="Maximise / Restore"
+              title={t('app.maximiseRestore')}
             >
               <svg width="11" height="11" viewBox="0 0 11 11"><rect x="1" y="1" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg>
             </button>
@@ -1925,7 +1930,7 @@ export default function App() {
                 e.preventDefault();
                 guardDirty(actuallyCloseWindow);
               }}
-              title="Close"
+              title={t('app.windowClose')}
             >
               <svg width="11" height="11" viewBox="0 0 11 11">
                 <line x1="1" y1="1" x2="10" y2="10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -2012,6 +2017,7 @@ export default function App() {
         onAspectRatioCycle={handleAspectRatioCycle}
         availableUpdate={availableUpdate}
         onVersionClick={availableUpdate ? () => { setShowSettings(true); setSettingsScrollToUpdates(true); } : undefined}
+        locale={settings.locale}
       />
 
       {showSettings && (
@@ -2051,9 +2057,9 @@ export default function App() {
 
       {marpPrompt && (
         <InfoBanner
-          message="This looks like a Marp deck."
+          message={t('app.marpDetected')}
           actions={[{
-            label: 'Convert to Kova',
+            label: t('app.marpConvert'),
             onClick: async () => {
               const { text, dir } = marpPrompt;
               const { markdown, dropped } = importMarp(text);
@@ -2069,7 +2075,7 @@ export default function App() {
       )}
       {marpLoss != null && marpLoss > 0 && (
         <InfoBanner
-          message={`Imported. ${marpLoss} Marp feature${marpLoss === 1 ? '' : 's'} simplified.`}
+          message={t('app.marpImported', { count: marpLoss })}
           onDismiss={() => setMarpLoss(null)}
         />
       )}
@@ -2105,12 +2111,12 @@ export default function App() {
             padding: '24px 28px', width: 340, maxWidth: '90vw',
           }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              File changed externally
+              {t('app.fileChangedExternally')}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
               {isDirty
-                ? 'Another application modified this file. Reload to get the latest version, or save your current edits under a new name.'
-                : 'Another application modified this file. The latest version has been loaded.'}
+                ? t('app.fileChangedExternallyDirty')
+                : t('app.fileChangedExternallyClean')}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               {isDirty && (
@@ -2131,19 +2137,19 @@ export default function App() {
                         diskContentRef.current = newContent;
                       } catch (err) { console.error('Failed to reload file:', err); }
                     }}
-                  >Reload</button>
+                  >{t('common.reload')}</button>
                   <button
                     className="btn"
                     onClick={async () => {
                       setShowExternalChangeDialog(false);
                       await handleSaveAs();
                     }}
-                  >Save As…</button>
+                  >{t('common.saveAs')}</button>
                 </>
               )}
               {!isDirty && (
                 <button className="btn btn-primary" onClick={() => setShowExternalChangeDialog(false)}>
-                  OK
+                  {t('common.ok')}
                 </button>
               )}
             </div>
@@ -2161,9 +2167,9 @@ export default function App() {
             padding: '24px 28px', width: 360, maxWidth: '90vw',
           }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>
-              Export PDF
+              {t('app.exportPdfTitle')}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-label)', marginBottom: 8 }}>Slides per page</div>
+            <div style={{ fontSize: 12, color: 'var(--text-label)', marginBottom: 8 }}>{t('app.slidesPerPage')}</div>
             <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
               {[1, 2, 4, 6].map((n) => (
                 <button
@@ -2185,12 +2191,12 @@ export default function App() {
                     disabled={!notesOk}
                     onChange={(e) => setPdfNotesOn(e.target.checked)}
                   />
-                  Include speaker notes (handout){pdfPerPage === 1 && !hasNotes ? ' — none in this deck' : ''}
+                  {t('app.includeSpeakerNotes', { noneNote: pdfPerPage === 1 && !hasNotes ? t('app.includeSpeakerNotesNone') : '' })}
                 </label>
               );
             })()}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setPdfOptionsOpen(false)}>Cancel</button>
+              <button className="btn" onClick={() => setPdfOptionsOpen(false)}>{t('common.cancel')}</button>
               <button
                 className="btn btn-primary"
                 onClick={() => {
@@ -2198,7 +2204,7 @@ export default function App() {
                   const notes = pdfPerPage === 1 && pdfNotesOn ? visibleSlides.map((s) => s.speakerNotes) : undefined;
                   void handleExportPdf({ perPage: pdfPerPage, notes, paper: settings.pdfPageSize });
                 }}
-              >Export</button>
+              >{t('app.exportAction')}</button>
             </div>
           </div>
         </>
@@ -2217,18 +2223,18 @@ export default function App() {
             padding: '24px 28px', width: 320, maxWidth: '90vw',
           }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              Unsaved changes
+              {t('app.unsavedChangesTitle')}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
-              You have unsaved changes. Save before continuing?
+              {t('app.unsavedChangesMessage')}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setConfirmCloseAction(null)}>Cancel</button>
+              <button className="btn" onClick={() => setConfirmCloseAction(null)}>{t('common.cancel')}</button>
               <button
                 className="btn"
                 style={{ background: '#c0392b', borderColor: '#c0392b', color: '#fff' }}
                 onClick={() => { const a = confirmCloseAction; setConfirmCloseAction(null); a(); }}
-              >Discard</button>
+              >{t('common.discard')}</button>
               <button
                 className="btn btn-primary"
                 onClick={async () => {
@@ -2242,7 +2248,7 @@ export default function App() {
                   }
                   action?.();
                 }}
-              >Save</button>
+              >{t('common.save')}</button>
             </div>
           </div>
         </>
@@ -2261,13 +2267,13 @@ export default function App() {
             padding: '24px 28px', width: 340, maxWidth: '90vw',
           }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-              Open file
+              {t('app.openFileTitle')}
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
-              Opening <strong>{recentFileBasename(dropConfirmPath)}</strong> will replace the current document.
+              {t('app.openFileReplaceWarningPrefix')} <strong>{recentFileBasename(dropConfirmPath)}</strong> {t('app.openFileReplaceWarningSuffix')}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button className="btn" onClick={() => setDropConfirmPath(null)}>Cancel</button>
+              <button className="btn" onClick={() => setDropConfirmPath(null)}>{t('common.cancel')}</button>
               <button
                 className="btn btn-primary"
                 onClick={async () => {
@@ -2282,7 +2288,7 @@ export default function App() {
                     setRecents(removeRecentFile(path));
                   }
                 }}
-              >Open</button>
+              >{t('common.open')}</button>
             </div>
           </div>
         </>
@@ -2370,5 +2376,6 @@ export default function App() {
         );
       })()}
     </div>
+    </I18nProvider>
   );
 }

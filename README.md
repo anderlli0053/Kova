@@ -72,7 +72,7 @@ npm run tauri dev      # development — hot-reload
 npm run tauri build    # release binary
 ```
 
-See the [Contributing guide](https://wiki.kova.md/contributing/) for more details.
+See the [Contributing guide](https://wiki.kova.md/contributing/) for more details, or [TRANSLATING.md](TRANSLATING.md) if you'd like to add a language.
 
 ## Keybindings
 

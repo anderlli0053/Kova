@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { ThemeFonts } from '../../engine/theme';
 import { isFontAvailable } from '../../engine/fontDetect';
+import { useT } from '../../i18n';
 
 interface Props {
   fonts: ThemeFonts;
@@ -39,10 +40,10 @@ const CURATED: Record<keyof ThemeFonts, FontOption[]> = {
   code:  MONO,
 };
 
-const FONT_FIELDS: Array<{ key: keyof ThemeFonts; label: string }> = [
-  { key: 'title', label: 'Title' },
-  { key: 'body',  label: 'Body' },
-  { key: 'code',  label: 'Code' },
+const FONT_FIELDS: Array<{ key: keyof ThemeFonts; labelKey: 'inspector.fontFieldTitle' | 'inspector.fontFieldBody' | 'inspector.fontFieldCode' }> = [
+  { key: 'title', labelKey: 'inspector.fontFieldTitle' },
+  { key: 'body',  labelKey: 'inspector.fontFieldBody' },
+  { key: 'code',  labelKey: 'inspector.fontFieldCode' },
 ];
 
 // ── Custom dropdown ───────────────────────────────────────────────────────────
@@ -162,6 +163,7 @@ function FontSelect({ value, groups, onChange }: {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function FontControls({ fonts, onChange }: Props) {
+  const t = useT();
   const [systemFonts, setSystemFonts] = useState<string[]>([]);
 
   useEffect(() => {
@@ -172,7 +174,7 @@ export function FontControls({ fonts, onChange }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      {FONT_FIELDS.map(({ key, label }) => {
+      {FONT_FIELDS.map(({ key, labelKey }) => {
         const curated = CURATED[key];
         const curatedValues = new Set(curated.map((o) => o.value));
         const current = fonts[key];
@@ -199,10 +201,10 @@ export function FontControls({ fonts, onChange }: Props) {
         return (
           <div key={key}>
             <label style={{ fontSize: 11, color: 'var(--text-label)', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-              {label}
+              {t(labelKey)}
               {primaryUnavailable && (
                 <span
-                  title={`"${current.split(',')[0].trim()}" isn't installed on this computer. Kova is falling back to a substitute font here — and the same substitution may happen differently (or not at all) on another OS, so this deck may look different when opened elsewhere.`}
+                  title={t('inspector.fontUnavailableWarning', { font: current.split(',')[0].trim() })}
                   style={{ color: 'var(--dirty-color)', cursor: 'help', fontSize: 12, lineHeight: 1 }}
                 >
                   ⚠

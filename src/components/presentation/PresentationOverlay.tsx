@@ -3,6 +3,7 @@ import type { Slide, AspectRatio } from '../../engine/types';
 import type { Theme } from '../../engine/theme';
 import { SlideRenderer } from '../preview/SlideRenderer';
 import { SLIDE_W, formatTime, ScaledSlideBox, LaserDot } from './presentationShared';
+import { useT } from '../../i18n';
 import './PresentationOverlay.css';
 
 interface Props {
@@ -24,6 +25,7 @@ const NOTE_H  = 160;  // px — speaker notes panel height
 export function PresentationOverlay({
   slides, currentIndex, theme, docTitle, docDate, aspectRatio = { w: 16, h: 9 }, laserColor = '#ff2020', showTimer = false, onNavigate, onExit,
 }: Props) {
+  const t = useT();
   const slide = slides[currentIndex];
 
   const handleNavigateTo = useCallback((slideIndex: number) => {
@@ -242,13 +244,13 @@ export function PresentationOverlay({
 
       {/* ARIA live region announces slide changes to screen readers */}
       <div aria-live="polite" aria-atomic="true" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}>
-        {`Slide ${currentIndex + 1} of ${total}`}
+        {t('presentation.slideAnnounce', { current: currentIndex + 1, total })}
       </div>
 
       {/* ── Speaker notes ── */}
       {showNotes && slide.speakerNotes && (
         <div className="pres-notes">
-          <span className="pres-notes__label">Speaker notes</span>
+          <span className="pres-notes__label">{t('presentation.speakerNotes')}</span>
           <p className="pres-notes__text">{slide.speakerNotes}</p>
         </div>
       )}
@@ -264,7 +266,7 @@ export function PresentationOverlay({
           className="pres-hud__btn"
           onClick={(e) => { e.stopPropagation(); goPrev(); }}
           disabled={currentIndex === 0}
-          title="Previous (←)"
+          title={t('presentation.previousSlide')}
         >‹</button>
 
         {jumpInput !== null ? (
@@ -292,7 +294,7 @@ export function PresentationOverlay({
           <span
             className="pres-hud__counter"
             onClick={(e) => { e.stopPropagation(); setJumpInput(String(currentIndex + 1)); }}
-            title="Click to jump to slide"
+            title={t('presentation.jumpToSlide')}
           >{currentIndex + 1} / {total}</span>
         )}
 
@@ -300,32 +302,32 @@ export function PresentationOverlay({
           className="pres-hud__btn"
           onClick={(e) => { e.stopPropagation(); goNext(); }}
           disabled={currentIndex === total - 1}
-          title="Next (→ / Space)"
+          title={t('presentation.nextSlide')}
         >›</button>
 
         {showTimer && (
-          <span className="pres-hud__timer" title="Elapsed time">{formatTime(elapsed)}</span>
+          <span className="pres-hud__timer" title={t('presentation.elapsedTime')}>{formatTime(elapsed)}</span>
         )}
 
         {hasNotes && (
           <button
             className={`pres-hud__btn${showNotes ? ' pres-hud__btn--active' : ''}`}
             onClick={(e) => { e.stopPropagation(); setShowNotes((p) => !p); }}
-            title="Toggle speaker notes (N)"
-          >Notes</button>
+            title={t('presentation.toggleSpeakerNotes')}
+          >{t('presentation.notesButton')}</button>
         )}
 
         <button
           className={`pres-hud__btn${laserActive ? ' pres-hud__btn--active' : ''}`}
           onClick={(e) => { e.stopPropagation(); setLaserActive((p) => !p); }}
-          title="Toggle laser pointer (L)"
-        >Laser</button>
+          title={t('presentation.toggleLaser')}
+        >{t('presentation.laserButton')}</button>
 
         <button
           className="pres-hud__btn pres-hud__btn--exit"
           onClick={(e) => { e.stopPropagation(); onExit(); }}
-          title="Exit presentation (Esc)"
-        >✕ ESC</button>
+          title={t('presentation.exitPresentation')}
+        >{t('presentation.exitButtonEsc')}</button>
       </div>
     </div>
   );

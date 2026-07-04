@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { Theme } from '../../engine/theme';
+import { useT } from '../../i18n';
+import type { MessageKey } from '../../i18n';
 
 interface Props {
   logo: string | undefined;
@@ -15,17 +17,18 @@ interface Props {
   onFooterChange: (footer: Theme['footer']) => void;
 }
 
-const POSITIONS: Array<{ value: Theme['logo_position']; label: string }> = [
-  { value: 'top-left',     label: 'Top left' },
-  { value: 'top-right',    label: 'Top right' },
-  { value: 'bottom-left',  label: 'Bottom left' },
-  { value: 'bottom-right', label: 'Bottom right' },
+const POSITIONS: Array<{ value: Theme['logo_position']; labelKey: MessageKey }> = [
+  { value: 'top-left',     labelKey: 'inspector.positionTopLeft' },
+  { value: 'top-right',    labelKey: 'inspector.positionTopRight' },
+  { value: 'bottom-left',  labelKey: 'inspector.positionBottomLeft' },
+  { value: 'bottom-right', labelKey: 'inspector.positionBottomRight' },
 ];
 
 export function LogoControls({
   logo, logoPosition, logoOpacity, header, footer,
   onLogoChange, onLogoPositionChange, onLogoOpacityChange, onHeaderChange, onFooterChange,
 }: Props) {
+  const t = useT();
   const pickLogo = useCallback(async () => {
     const selected = await open({
       filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'svg', 'gif'] }],
@@ -41,19 +44,19 @@ export function LogoControls({
 
       {/* Logo */}
       <div>
-        <div style={{ fontSize: 11, color: 'var(--text-label)', marginBottom: 4 }}>Logo</div>
+        <div style={{ fontSize: 11, color: 'var(--text-label)', marginBottom: 4 }}>{t('inspector.logoLabel')}</div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {logo && (
             <img src={logo} alt="logo preview"
               style={{ height: 24, width: 'auto', borderRadius: 2, border: '1px solid var(--border-input)' }} />
           )}
           <button className="btn" style={{ fontSize: 11, padding: '3px 8px' }} onClick={pickLogo}>
-            {logo ? 'Change' : 'Choose…'}
+            {logo ? t('inspector.logoChange') : t('inspector.logoChoose')}
           </button>
           {logo && (
             <button className="btn" style={{ fontSize: 11, padding: '3px 8px' }}
               onClick={() => onLogoChange(undefined)}>
-              Remove
+              {t('common.remove')}
             </button>
           )}
         </div>
@@ -79,14 +82,14 @@ export function LogoControls({
                       transition: 'all 0.12s',
                     }}
                   >
-                    {p.label}
+                    {t(p.labelKey)}
                   </button>
                 );
               })}
             </div>
             <div style={{ marginTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-label)' }}>Opacity</span>
+                <span style={{ fontSize: 11, color: 'var(--text-label)' }}>{t('inspector.opacityLabel')}</span>
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
                   {Math.round(logoOpacity * 100)}%
                 </span>
@@ -115,14 +118,14 @@ export function LogoControls({
             style={{ cursor: 'pointer' }}
           />
           <label htmlFor="header-show" style={{ fontSize: 11, color: 'var(--text-label)', cursor: 'pointer' }}>
-            Show header
+            {t('inspector.showHeader')}
           </label>
         </div>
         {header.show && (
           <input
             type="text"
             value={header.text}
-            placeholder="Header text ({title}, {date})"
+            placeholder={t('inspector.headerPlaceholder')}
             onChange={(e) => onHeaderChange({ ...header, text: e.target.value })}
             style={{ width: '100%', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-input)', borderRadius: 4, padding: '4px 7px', fontSize: 11 }}
           />
@@ -143,7 +146,7 @@ export function LogoControls({
             style={{ cursor: 'pointer' }}
           />
           <label htmlFor="footer-show" style={{ fontSize: 11, color: 'var(--text-label)', cursor: 'pointer' }}>
-            Show footer
+            {t('inspector.showFooter')}
           </label>
         </div>
         {footer.show && (
@@ -151,7 +154,7 @@ export function LogoControls({
             <input
               type="text"
               value={footer.text}
-              placeholder="Footer text ({title}, {date})"
+              placeholder={t('inspector.footerPlaceholder')}
               onChange={(e) => onFooterChange({ ...footer, text: e.target.value })}
               style={{ width: '100%', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-input)', borderRadius: 4, padding: '4px 7px', fontSize: 11, marginBottom: 4 }}
             />
@@ -164,7 +167,7 @@ export function LogoControls({
                 style={{ cursor: 'pointer' }}
               />
               <label htmlFor="footer-slidenum" style={{ fontSize: 11, color: 'var(--text-label)', cursor: 'pointer' }}>
-                Slide number
+                {t('inspector.slideNumberLabel')}
               </label>
             </div>
           </>

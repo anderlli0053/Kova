@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { useT } from '../../i18n';
 
 // Manifest is fetched from GitHub so the SHA-256 hashes come from a source
 // independent of the CDN server — a compromised themes.kova.md cannot forge
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Props) {
+  const t = useT();
   const [themes, setThemes] = useState<RemoteTheme[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [busy, setBusy] = useState<Record<string, boolean>>({});
@@ -59,7 +61,7 @@ export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Pr
     setBusy((p) => ({ ...p, [id]: true }));
     setErrors((p) => ({ ...p, [id]: '' }));
     try {
-      const theme = themes.find((t) => t.id === id);
+      const theme = themes.find((rt) => rt.id === id);
       if (!theme?.sha256) {
         throw new Error('Cannot install: theme is missing its integrity hash');
       }
@@ -119,7 +121,7 @@ export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Pr
           flexShrink: 0,
         }}>
           <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-            More Themes
+            {t('inspector.themeLibraryTitle')}
           </h2>
           <button
             type="button"
@@ -140,14 +142,14 @@ export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Pr
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
           {status === 'loading' && (
             <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: '40px 0' }}>
-              Loading…
+              {t('inspector.themeLibraryLoading')}
             </div>
           )}
 
           {status === 'error' && (
             <div style={{ textAlign: 'center', padding: '40px 0' }}>
               <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Could not reach themes.kova.md
+                {t('inspector.themeLibraryError')}
               </div>
               <button
                 type="button"
@@ -158,24 +160,24 @@ export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Pr
                   color: 'var(--text-secondary)',
                 }}
               >
-                Retry
+                {t('common.retry')}
               </button>
             </div>
           )}
 
           {status === 'ready' && themes.length === 0 && (
             <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: '40px 0' }}>
-              No themes available yet.
+              {t('inspector.themeLibraryEmpty')}
             </div>
           )}
 
-          {status === 'ready' && themes.map((t) => {
-            const installed = installedIds.has(t.id);
-            const loading = busy[t.id] ?? false;
-            const installError = errors[t.id] ?? '';
+          {status === 'ready' && themes.map((rt) => {
+            const installed = installedIds.has(rt.id);
+            const loading = busy[rt.id] ?? false;
+            const installError = errors[rt.id] ?? '';
             return (
               <div
-                key={t.id}
+                key={rt.id}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
@@ -195,23 +197,23 @@ export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Pr
                 }}
               >
                 <div style={{ display: 'flex', gap: 3, flexShrink: 0 }}>
-                  <Swatch color={t.colors.primary} />
-                  <Swatch color={t.colors.background} border />
-                  <Swatch color={t.colors.accent} />
-                  <Swatch color={t.colors.text} />
-                  {t.colors.section_bg && <Swatch color={t.colors.section_bg} />}
+                  <Swatch color={rt.colors.primary} />
+                  <Swatch color={rt.colors.background} border />
+                  <Swatch color={rt.colors.accent} />
+                  <Swatch color={rt.colors.text} />
+                  {rt.colors.section_bg && <Swatch color={rt.colors.section_bg} />}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>
-                    {t.name}
+                    {rt.name}
                   </div>
-                  {t.description && (
+                  {rt.description && (
                     <div style={{
                       fontSize: 11, color: 'var(--text-secondary)', marginTop: 2,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {t.description}
+                      {rt.description}
                     </div>
                   )}
                 </div>
@@ -220,19 +222,19 @@ export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Pr
                   <button
                     type="button"
                     disabled={loading}
-                    onClick={() => remove(t.id)}
+                    onClick={() => remove(rt.id)}
                     style={secondaryBtnStyle(loading)}
                   >
-                    {loading ? 'Removing…' : 'Remove'}
+                    {loading ? t('common.removing') : t('common.remove')}
                   </button>
                 ) : (
                   <button
                     type="button"
                     disabled={loading}
-                    onClick={() => install(t.id)}
+                    onClick={() => install(rt.id)}
                     style={accentBtnStyle(loading)}
                   >
-                    {loading ? 'Installing…' : 'Install'}
+                    {loading ? t('common.installing') : t('common.install')}
                   </button>
                 )}
               </div>
@@ -263,9 +265,9 @@ export function ThemeLibraryModal({ installedIds, onThemesChanged, onClose }: Pr
           flexShrink: 0,
           textAlign: 'center',
         }}>
-          From{' '}
+          {t('inspector.themeLibraryFrom')}{' '}
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }}>github.com/kovamd/themes</span>
-          {' · '}Installed themes are added to the Theme picker immediately
+          {' · '}{t('inspector.themeLibraryFooter')}
         </div>
 
       </div>

@@ -12,6 +12,7 @@ import { themeToVars, resolveTemplate, DEFAULT_THEME, hexToHsl, hslToHex, defaul
 import './SlideRenderer.css';
 import { mermaidSvgCache } from '../../engine/export/mermaidSvgCache';
 import { queuedMermaidRender } from '../../engine/export/mermaidRenderQueue';
+import { useT } from '../../i18n';
 
 mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'strict' });
 
@@ -29,6 +30,7 @@ function parseSizeHint(title?: string): React.CSSProperties | null {
 // then applies a CSS transform to the inner wrapper — no visual flash because
 // the measurement and style update both happen inside useLayoutEffect (before paint).
 function OverflowPane({ className, elements }: { className: string; elements: SlideElement[] }) {
+  const t = useT();
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const { isThumbnail } = useContext(SlideCtx);
@@ -93,7 +95,7 @@ function OverflowPane({ className, elements }: { className: string; elements: Sl
       <div ref={innerRef} style={{ transformOrigin: 'top left' }}>
         <Elements elements={elements} />
       </div>
-      {fitScale < 0.99 && !isThumbnail && <div className="sl-overflow-badge">rescaled to fit</div>}
+      {fitScale < 0.99 && !isThumbnail && <div className="sl-overflow-badge">{t('preview.rescaledToFit')}</div>}
     </div>
   );
 }
@@ -777,11 +779,12 @@ function ListItemNode({ item }: { item: ListItem }) {
 // ── Table of contents ─────────────────────────────────────────────────────────
 
 function TocElement({ el }: { el: Extract<SlideElement, { type: 'toc' }> }) {
+  const t = useT();
   const { isThumbnail, onNavigateTo } = useContext(SlideCtx);
   const interactive = !isThumbnail && !!onNavigateTo;
 
   if (el.entries.length === 0) {
-    return <p className="sl-para" style={{ opacity: 0.5, fontStyle: 'italic' }}>No titled slides found</p>;
+    return <p className="sl-para" style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('preview.noTitledSlidesFound')}</p>;
   }
   return (
     <ol className="sl-list">
@@ -803,6 +806,7 @@ function TocElement({ el }: { el: Extract<SlideElement, { type: 'toc' }> }) {
 // ── Media embeds ──────────────────────────────────────────────────────────────
 
 function YoutubeEmbed({ embed }: { embed: Extract<SlideElement, { type: 'youtube' }> }) {
+  const t = useT();
   const { isThumbnail } = useContext(SlideCtx);
   const thumb = youtubeThumb(embed.url);
 
@@ -816,14 +820,14 @@ function YoutubeEmbed({ embed }: { embed: Extract<SlideElement, { type: 'youtube
     <div
       className={`sl-youtube${!isThumbnail ? ' sl-youtube--clickable' : ''}`}
       onClick={handleClick}
-      title={!isThumbnail ? `Open in browser: ${embed.url}` : undefined}
+      title={!isThumbnail ? t('preview.openInBrowserTitle', { url: embed.url }) : undefined}
     >
       {thumb
         ? <img src={thumb} alt={embed.label} className="sl-youtube__thumb" />
-        : <div className="sl-youtube__placeholder">▶ YouTube</div>
+        : <div className="sl-youtube__placeholder">{t('preview.youtubePlaceholder')}</div>
       }
       <div className="sl-youtube__label">{embed.label}</div>
-      {!isThumbnail && <div className="sl-youtube__open-hint">Click to open in browser</div>}
+      {!isThumbnail && <div className="sl-youtube__open-hint">{t('preview.clickToOpenInBrowser')}</div>}
     </div>
   );
 }

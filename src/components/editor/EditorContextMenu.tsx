@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '../../i18n';
 
 type MenuEntry =
   | { type: 'item'; label: string; shortcut?: string; action: () => void; disabled?: boolean }
@@ -18,6 +19,7 @@ interface Props {
 const MENU_WIDTH = 205;
 
 export function EditorContextMenu({ x, y, onClose, entries, onPanelEnter, onPanelLeave }: Props) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -118,7 +120,7 @@ export function EditorContextMenu({ x, y, onClose, entries, onPanelEnter, onPane
       <div
         ref={ref}
         role="menu"
-        aria-label="Context menu"
+        aria-label={t('editor.contextMenuAriaLabel')}
         style={panelStyle}
         onMouseEnter={onPanelEnter}
         onMouseLeave={onPanelLeave}

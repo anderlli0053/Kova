@@ -30,6 +30,7 @@ export const EDITOR_FONT_OPTIONS: { value: EditorFont; label: string; family: st
 export interface AppSettings {
   settingsVersion: number;
   uiTheme: UiTheme;
+  locale: string;
   uiScale: number;
   editorFont: EditorFont;
   autosave: boolean;
@@ -62,6 +63,7 @@ function buildDefaults(): AppSettings {
   return {
     settingsVersion: 1,
     uiTheme: 'auto',
+    locale: 'auto',
     uiScale: 1,
     editorFont: 'ibm-plex-mono',
     autosave: true,

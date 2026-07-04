@@ -7,6 +7,7 @@ import { SLIDE_W, ScaledSlideBox, LaserDot } from './components/presentation/pre
 import type { Slide, AspectRatio } from './engine/types';
 import type { Theme } from './engine/theme';
 import { registerBundledFonts, registerCachedFont } from './engine/bundledFonts';
+import { I18nProvider, useT } from './i18n';
 import './styles/global.css';
 
 export interface PresentInitPayload {
@@ -19,6 +20,15 @@ export interface PresentInitPayload {
 }
 
 export function AudienceApp() {
+  return (
+    <I18nProvider locale="auto">
+      <AudienceAppInner />
+    </I18nProvider>
+  );
+}
+
+function AudienceAppInner() {
+  const t = useT();
   const [initData, setInitData]         = useState<PresentInitPayload | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [scale, setScale]               = useState(1);
@@ -138,7 +148,7 @@ export function AudienceApp() {
         position: 'fixed', inset: 0, background: '#000',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{ color: '#2a2a2a', fontSize: 13 }}>Connecting…</div>
+        <div style={{ color: '#2a2a2a', fontSize: 13 }}>{t('app.connecting')}</div>
       </div>
     );
   }

@@ -8,6 +8,7 @@ import { FontControls } from '../inspector/FontControls';
 import { LogoControls } from '../inspector/LogoControls';
 import { FormatControls } from '../inspector/FormatControls';
 import type { FormatCmd } from './EditorPanel';
+import { useT } from '../../i18n';
 
 interface Props {
   filePath: string | null;
@@ -29,6 +30,7 @@ export function InspectorPanel({
   filePath, slideCount, frontmatter,
   theme, allThemes, onThemeSelect, onThemeChange, onMetaChange, onFormat, onOpenLibrary,
 }: Props) {
+  const t = useT();
   const [open, setOpen] = useState<Set<Section>>(new Set(['format']));
   const [localTitle,  setLocalTitle]  = useState(frontmatter.title  ?? '');
   const [localAuthor, setLocalAuthor] = useState(frontmatter.author ?? '');
@@ -54,10 +56,10 @@ export function InspectorPanel({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--bg-panel-alt)' }}>
       <div className="panel-header">
-        Inspector
+        {t('inspector.inspectorTitle')}
         <button
           onClick={toggleAll}
-          title={allOpen ? 'Collapse all sections' : 'Expand all sections'}
+          title={allOpen ? t('inspector.collapseAllSections') : t('inspector.expandAllSections')}
           style={{
             marginLeft: 'auto', background: 'none', border: 'none',
             color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10, padding: '0 2px',
@@ -70,28 +72,28 @@ export function InspectorPanel({
 
         {/* Document info */}
         <InfoSection>
-          <Row label="File"   value={filePath ? shortPath(filePath) : '—'} />
-          <Row label="Slides" value={slideCount > 0 ? String(slideCount) : '—'} />
+          <Row label={t('inspector.fileLabel')}   value={filePath ? shortPath(filePath) : '—'} />
+          <Row label={t('inspector.slidesLabel')} value={slideCount > 0 ? String(slideCount) : '—'} />
           <EditableRow
-            label="Title"
+            label={t('inspector.titleLabel')}
             value={localTitle}
-            placeholder="Untitled"
+            placeholder={t('inspector.titlePlaceholder')}
             onChange={setLocalTitle}
             onFocus={() => { focusedFieldRef.current = 'title'; }}
             onBlur={() => { focusedFieldRef.current = null; onMetaChange('title', localTitle); }}
           />
           <EditableRow
-            label="Author"
+            label={t('inspector.authorLabel')}
             value={localAuthor}
-            placeholder="Author"
+            placeholder={t('inspector.authorPlaceholder')}
             onChange={setLocalAuthor}
             onFocus={() => { focusedFieldRef.current = 'author'; }}
             onBlur={() => { focusedFieldRef.current = null; onMetaChange('author', localAuthor); }}
           />
           <EditableRow
-            label="Date"
+            label={t('inspector.dateLabel')}
             value={localDate}
-            placeholder="Date"
+            placeholder={t('inspector.datePlaceholder')}
             onChange={setLocalDate}
             onFocus={() => { focusedFieldRef.current = 'date'; }}
             onBlur={() => { focusedFieldRef.current = null; onMetaChange('date', localDate); }}
@@ -101,14 +103,14 @@ export function InspectorPanel({
         <Divider />
 
         {/* Text formatting */}
-        <Accordion label="Format" open={open.has('format')} onToggle={() => toggle('format')}>
+        <Accordion label={t('inspector.sectionFormat')} open={open.has('format')} onToggle={() => toggle('format')}>
           <FormatControls onFormat={onFormat} />
         </Accordion>
 
         <Divider />
 
         {/* Theme picker */}
-        <Accordion label="Theme" open={open.has('theme')} onToggle={() => toggle('theme')}>
+        <Accordion label={t('inspector.sectionTheme')} open={open.has('theme')} onToggle={() => toggle('theme')}>
           <ThemePicker themes={allThemes} activeId={theme.id} onSelect={onThemeSelect} />
           <button
             type="button"
@@ -126,11 +128,11 @@ export function InspectorPanel({
               textAlign: 'center',
             }}
           >
-            More Themes…
+            {t('inspector.moreThemesButton')}
           </button>
         </Accordion>
 
-        <Accordion label="Colours" open={open.has('colours')} onToggle={() => toggle('colours')}>
+        <Accordion label={t('inspector.sectionColours')} open={open.has('colours')} onToggle={() => toggle('colours')}>
           <ColorControls
             colors={theme.colors}
             onChange={(key, val) => onThemeChange({ colors: { ...theme.colors, [key]: val } })}
@@ -144,14 +146,14 @@ export function InspectorPanel({
           />
         </Accordion>
 
-        <Accordion label="Fonts" open={open.has('fonts')} onToggle={() => toggle('fonts')}>
+        <Accordion label={t('inspector.sectionFonts')} open={open.has('fonts')} onToggle={() => toggle('fonts')}>
           <FontControls
             fonts={theme.fonts}
             onChange={(key, val) => onThemeChange({ fonts: { ...theme.fonts, [key]: val } })}
           />
         </Accordion>
 
-        <Accordion label="Branding" open={open.has('branding')} onToggle={() => toggle('branding')}>
+        <Accordion label={t('inspector.sectionBranding')} open={open.has('branding')} onToggle={() => toggle('branding')}>
           <LogoControls
             logo={theme.logo}
             logoPosition={theme.logo_position}

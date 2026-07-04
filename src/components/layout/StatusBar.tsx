@@ -1,4 +1,5 @@
 import { APP_VERSION } from '../../version';
+import { useT } from '../../i18n';
 
 const WPM = 110;
 const AR_CYCLE: readonly string[] = ['16:9', '4:3', '16:10'];
@@ -14,12 +15,14 @@ interface Props {
   onAspectRatioCycle: () => void;
   availableUpdate?: string | null;
   onVersionClick?: () => void;
+  locale: string;
 }
 
-export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, filePath, externalImageCount, aspectRatioLabel, onAspectRatioCycle, availableUpdate, onVersionClick }: Props) {
+export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, filePath, externalImageCount, aspectRatioLabel, onAspectRatioCycle, availableUpdate, onVersionClick, locale }: Props) {
+  const t = useT();
   const minutes = Math.ceil(wordCount / WPM);
-  const timeStr = minutes < 2 ? `${minutes} min` : `${minutes} mins`;
   const nextAr = AR_CYCLE[(AR_CYCLE.indexOf(aspectRatioLabel) + 1) % AR_CYCLE.length];
+  const formattedWordCount = wordCount.toLocaleString(locale === 'auto' ? undefined : locale);
 
   return (
     <div
@@ -37,17 +40,17 @@ export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, fileP
       }}
     >
       <Cell>
-        {totalSlides > 0 ? `Slide ${currentSlide} of ${totalSlides}` : 'No slides'}
+        {totalSlides > 0 ? t('layout.slideCountStatus', { current: currentSlide, total: totalSlides }) : t('layout.noSlides')}
       </Cell>
       <Divider />
-      <Cell>Est. {timeStr}</Cell>
+      <Cell>{t('layout.estimatedMinutes', { count: minutes })}</Cell>
       <Divider />
-      <Cell>{wordCount.toLocaleString()} words</Cell>
+      <Cell>{t('layout.wordCount', { count: formattedWordCount })}</Cell>
       <Divider />
       <button
         type="button"
         onClick={onAspectRatioCycle}
-        title={`Aspect ratio: ${aspectRatioLabel} — click for ${nextAr}`}
+        title={t('layout.aspectRatioTooltip', { current: aspectRatioLabel, next: nextAr })}
         style={{
           padding: '0 10px',
           height: '100%',
@@ -66,10 +69,10 @@ export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, fileP
         <>
           <Divider />
           <Cell
-            title={`${externalImageCount} image${externalImageCount > 1 ? 's are' : ' is'} outside this file's folder — ${externalImageCount > 1 ? 'they' : 'it'} won't appear if the file is moved`}
+            title={t('layout.externalImageWarning', { count: externalImageCount })}
             style={{ color: 'var(--dirty-color)', cursor: 'default' }}
           >
-            ⚠ {externalImageCount} external image{externalImageCount > 1 ? 's' : ''}
+            {t('layout.externalImageBadge', { count: externalImageCount })}
           </Cell>
         </>
       )}
@@ -77,7 +80,7 @@ export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, fileP
       {(filePath || isDirty) && (
         <>
           <Cell style={{ color: isDirty ? 'var(--dirty-color)' : 'var(--text-dim)' }}>
-            {isDirty ? (filePath ? 'Unsaved' : 'New — unsaved') : 'Saved'}
+            {isDirty ? (filePath ? t('layout.unsaved') : t('layout.newUnsaved')) : t('layout.saved')}
           </Cell>
           <Divider />
         </>
@@ -86,7 +89,7 @@ export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, fileP
         <button
           type="button"
           onClick={onVersionClick}
-          title={`Update ${availableUpdate} available — click to update`}
+          title={t('layout.updateAvailableTooltip', { version: availableUpdate })}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -102,7 +105,7 @@ export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, fileP
             letterSpacing: '0.02em',
           }}
         >
-          kova v{APP_VERSION}
+          {t('layout.kovaVersion', { version: APP_VERSION })}
           <svg
             width="11" height="11" viewBox="0 0 24 24"
             fill="none" stroke="#D94F00" strokeWidth="2.4"
@@ -114,7 +117,7 @@ export function StatusBar({ currentSlide, totalSlides, wordCount, isDirty, fileP
           </svg>
         </button>
       ) : (
-        <Cell>kova v{APP_VERSION}</Cell>
+        <Cell>{t('layout.kovaVersion', { version: APP_VERSION })}</Cell>
       )}
     </div>
   );

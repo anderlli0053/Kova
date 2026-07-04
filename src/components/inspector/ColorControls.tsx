@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { ThemeColors } from '../../engine/theme';
 import { defaultChartPalette } from '../../engine/theme';
+import { useT } from '../../i18n';
+import type { MessageKey } from '../../i18n';
 
 interface Props {
   colors: ThemeColors;
@@ -9,14 +11,14 @@ interface Props {
   onChartPaletteReset: () => void;
 }
 
-const COLOR_FIELDS: Array<{ key: keyof ThemeColors; label: string }> = [
-  { key: 'primary',     label: 'Primary' },
-  { key: 'accent',      label: 'Accent' },
-  { key: 'background',  label: 'Background' },
-  { key: 'text',        label: 'Text' },
-  { key: 'title_text',  label: 'Title text' },
-  { key: 'section_bg',  label: 'Section bg' },
-  { key: 'code_bg',     label: 'Code bg' },
+const COLOR_FIELDS: Array<{ key: keyof ThemeColors; labelKey: MessageKey }> = [
+  { key: 'primary',     labelKey: 'inspector.colorPrimary' },
+  { key: 'accent',      labelKey: 'inspector.colorAccent' },
+  { key: 'background',  labelKey: 'inspector.colorBackground' },
+  { key: 'text',        labelKey: 'inspector.colorText' },
+  { key: 'title_text',  labelKey: 'inspector.colorTitleText' },
+  { key: 'section_bg',  labelKey: 'inspector.colorSectionBg' },
+  { key: 'code_bg',     labelKey: 'inspector.colorCodeBg' },
 ];
 
 const CHART_PALETTE_SIZE = 8;
@@ -32,6 +34,7 @@ const hexLabelStyle: React.CSSProperties = {
 };
 
 export function ColorControls({ colors, onChange, onChartColorChange, onChartPaletteReset }: Props) {
+  const t = useT();
   const [chartOpen, setChartOpen] = useState(false);
 
   const chartColors = colors.chart_colors && colors.chart_colors.length === CHART_PALETTE_SIZE
@@ -42,13 +45,13 @@ export function ColorControls({ colors, onChange, onChartColorChange, onChartPal
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-      {COLOR_FIELDS.map(({ key, label }) => (
+      {COLOR_FIELDS.map(({ key, labelKey }) => (
         <div key={key} style={colorRowStyle}>
           <label
             htmlFor={`color-${key}`}
             style={{ fontSize: 11, color: 'var(--text-label)', flex: 1, cursor: 'pointer' }}
           >
-            {label}
+            {t(labelKey)}
           </label>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <input
@@ -74,7 +77,7 @@ export function ColorControls({ colors, onChange, onChartColorChange, onChartPal
           }}
         >
           <span style={{ fontSize: 11, color: 'var(--text-label)' }}>
-            Diagram palette{hasCustomPalette ? ' *' : ''}
+            {t('inspector.diagramPalette')}{hasCustomPalette ? ' *' : ''}
           </span>
           <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>{chartOpen ? '▲' : '▼'}</span>
         </button>
@@ -87,7 +90,7 @@ export function ColorControls({ colors, onChange, onChartColorChange, onChartPal
                   htmlFor={`chart-color-${i}`}
                   style={{ fontSize: 11, color: 'var(--text-label)', flex: 1, cursor: 'pointer' }}
                 >
-                  Chart {i + 1}
+                  {t('inspector.chartColorLabel', { n: i + 1 })}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <input
@@ -110,7 +113,7 @@ export function ColorControls({ colors, onChange, onChartColorChange, onChartPal
                   padding: 0, textAlign: 'left', textDecoration: 'underline',
                 }}
               >
-                Reset to theme defaults
+                {t('inspector.resetToThemeDefaults')}
               </button>
             )}
           </div>
