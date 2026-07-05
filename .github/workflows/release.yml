@@ -33,11 +33,11 @@ jobs:
           - **Nix flake for reproducible builds** — `nix run github:KovaMD/Kova`, `nix profile install`, or `nix develop` for a ready-made dev shell (by @vadika, #122; addresses #9).
 
           ### Bug fixes
-          - **Fixed Linux AppImage auto-update** — the AppImage is now signed as part of the release pipeline, restoring self-update that had been broken since the earlier EGL-crash workaround shipped (fixes #3).
-          - **Fixed a stray left-margin gap in the editor** that grew or shrank again as the panel was resized, reintroduced after an earlier theme-based fix (relates to #28).
+          - **Fixed Linux AppImage auto-update** — the AppImage is now signed as part of the release pipeline, restoring self-update that had been broken since the earlier EGL-crash workaround shipped (reported by @frigaut, #3).
+          - **Fixed a stray left-margin gap in the editor** that grew or shrank again as the panel was resized, reintroduced after an earlier theme-based fix (reported by @a1880, #28).
           - **Fixed `{date}` in footer/header templates showing blank** when the document had no `date:` frontmatter field — it now defaults to today's date like the other template variables do.
-          - **Fixed Enter not confirming a slide-jump** when keystrokes were forwarded from the audience window in dual/mirror presentation mode (fixes #54).
-          - **Fixed Table of Contents overflow on long agendas** — layout was computed before ToC entries were resolved, so it could never switch to the two-column overflow layout used elsewhere (closes #57).
+          - **Fixed Enter not confirming a slide-jump** when keystrokes were forwarded from the audience window in dual/mirror presentation mode (reported by @a1880, #54).
+          - **Fixed Table of Contents overflow on long agendas** — layout was computed before ToC entries were resolved, so it could never switch to the two-column overflow layout used elsewhere (reported by @a1880, #57).
 
           ---
 
