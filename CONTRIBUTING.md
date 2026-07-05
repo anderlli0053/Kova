@@ -25,6 +25,9 @@ npm install
 npm run tauri dev      # development — hot-reload
 ```
 
+Nix users can skip the prerequisites — `nix develop` drops you in a shell with
+Rust, Node, and Tauri ready.
+
 Before opening a PR:
 
 ```bash

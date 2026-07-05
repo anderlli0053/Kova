@@ -1,0 +1,25 @@
+name: Nix Build
+
+# Builds the flake so a broken flake.nix / stale hash is caught in review.
+# Runs only when the flake or its inputs (frontend, Tauri shell) change.
+on:
+  push:
+    branches: [main]
+    paths: [flake.nix, flake.lock, src/**, 'src-tauri/**', package-lock.json]
+  pull_request:
+    paths: [flake.nix, flake.lock, src/**, 'src-tauri/**', package-lock.json]
+
+jobs:
+  nix-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Build package + dev shell
+        run: |
+          nix build .#default -L
+          nix develop --command true

@@ -1,0 +1,40 @@
+name: Nix Hash Sync
+
+# When a PR changes package-lock.json, recompute npmDepsHash and commit it
+# back so the flake keeps building. Same-repo PRs only — fork PRs get no write
+# token, so those contributors run packaging/nix/update-npm-hash.sh themselves
+# (the Nix Build check prints the expected hash on failure).
+on:
+  pull_request:
+    paths: [package-lock.json]
+
+jobs:
+  sync:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.head_ref }}
+          # PAT push retriggers Nix Build on the fix commit (GITHUB_TOKEN can't).
+          # No loop: the commit touches only flake.nix, this workflow watches
+          # package-lock.json. Without the PAT the hash still lands, but a
+          # maintainer must rerun Nix Build for a required check to clear.
+          token: ${{ secrets.NIX_HASH_SYNC_PAT || secrets.GITHUB_TOKEN }}
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Refresh npmDepsHash and commit if changed
+        run: |
+          bash packaging/nix/update-npm-hash.sh
+          if ! git diff --quiet flake.nix; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "build(nix): refresh npmDepsHash for lockfile change"
+            # Retry once against a concurrent push to the PR branch.
+            git push || { git pull --rebase && git push; }
+          fi

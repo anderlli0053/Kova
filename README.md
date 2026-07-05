@@ -60,6 +60,15 @@ sudo curl -o /etc/yum.repos.d/kova.repo \
 sudo dnf install kova   # openSUSE: zypper install kova
 ```
 
+**Nix (flakes)**
+
+```bash
+nix run github:KovaMD/Kova          # run without installing
+nix profile install github:KovaMD/Kova   # install into your profile
+```
+
+Or add `github:KovaMD/Kova` as a flake input and use `packages.<system>.default`.
+
 ## Building from source
 
 **Prerequisites:** [Node.js](https://nodejs.org/) 18+, [Rust](https://rustup.rs/) (stable), and [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your platform.
@@ -71,6 +80,8 @@ npm install
 npm run tauri dev      # development — hot-reload
 npm run tauri build    # release binary
 ```
+
+Nix users can skip the prerequisites: `nix develop` drops you in a shell with Rust, Node, and Tauri ready.
 
 See the [Contributing guide](https://wiki.kova.md/contributing/) for more details, or [TRANSLATING.md](TRANSLATING.md) if you'd like to add a language.
 
