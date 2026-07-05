@@ -5,8 +5,8 @@ export type SpellCheckLanguage =
   | 'ca' | 'cs_CZ' | 'da_DK' | 'de_DE' | 'el_GR'
   | 'en_AU' | 'en_GB' | 'en_US' | 'es_ES' | 'fr_FR'
   | 'hr_HR' | 'hu_HU' | 'it_IT' | 'nb_NO' | 'nl_NL'
-  | 'pl_PL' | 'pt_PT' | 'ro_RO' | 'ru_RU' | 'sv_SE'
-  | 'tr_TR' | 'uk_UA';
+  | 'pl_PL' | 'pt_PT' | 'ro_RO' | 'ru_RU' | 'sl_SI'
+  | 'sv_SE' | 'tr_TR' | 'uk_UA';
 
 // Sorted alphabetically by display label for the picker
 export const LANGUAGE_OPTIONS: { code: SpellCheckLanguage; label: string }[] = [
@@ -29,6 +29,7 @@ export const LANGUAGE_OPTIONS: { code: SpellCheckLanguage; label: string }[] = [
   { code: 'pt_PT', label: 'Português'        },
   { code: 'ro_RO', label: 'Română'           },
   { code: 'ru_RU', label: 'Русский'          },
+  { code: 'sl_SI', label: 'Slovenščina'      },
   { code: 'sv_SE', label: 'Svenska'          },
   { code: 'tr_TR', label: 'Türkçe'           },
   { code: 'uk_UA', label: 'Українська'       },
@@ -40,8 +41,8 @@ const PRIMARY_MAP: Partial<Record<string, SpellCheckLanguage>> = {
   ca: 'ca',    cs: 'cs_CZ', da: 'da_DK', de: 'de_DE', el: 'el_GR',
   en: 'en_US', es: 'es_ES', fr: 'fr_FR', hr: 'hr_HR', hu: 'hu_HU',
   it: 'it_IT', nb: 'nb_NO', nl: 'nl_NL', no: 'nb_NO', pl: 'pl_PL',
-  pt: 'pt_PT', ro: 'ro_RO', ru: 'ru_RU', sv: 'sv_SE', tr: 'tr_TR',
-  uk: 'uk_UA',
+  pt: 'pt_PT', ro: 'ro_RO', ru: 'ru_RU', sl: 'sl_SI', sv: 'sv_SE',
+  tr: 'tr_TR', uk: 'uk_UA',
 };
 
 export function detectOsLanguage(): SpellCheckLanguage {
