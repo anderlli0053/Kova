@@ -29,7 +29,7 @@ import { buildMacMenu } from './macMenu';
 import type { MacMenuHandlers } from './macMenu';
 import { loadKeybindings, matchShortcut, getCombo, formatCombo, isMac } from './engine/keybindings';
 import type { Keybindings } from './engine/keybindings';
-import { I18nProvider, useT } from './i18n';
+import { I18nProvider, useLocaleTranslator } from './i18n';
 
 import { parseDocument } from './engine/parser/markdownToSlides';
 import { extractFrontmatter, patchFrontmatter } from './engine/parser/frontmatter';
@@ -123,7 +123,7 @@ export default function App() {
   // separate from currentSlideIndex (which indexes the full editor deck).
   const [presentIndex, setPresentIndex]   = useState(0);
   const [settings, setSettings]           = useState<AppSettings>(loadSettings);
-  const t = useT();
+  const t = useLocaleTranslator(settings.locale);
   const [showSettings, setShowSettings]   = useState(false);
   const [settingsScrollToUpdates, setSettingsScrollToUpdates] = useState(false);
   const [showThemeLibrary, setShowThemeMarketplace] = useState(false);
@@ -1558,8 +1558,28 @@ export default function App() {
 
   useEffect(() => {
     if (!isMac) return;
-    void buildMacMenu(stableMenuHandlers, recents);
-  }, [recents, stableMenuHandlers]);
+    void buildMacMenu(stableMenuHandlers, recents, {
+      present: t('macMenu.present'),
+      file: t('app.menuFile'),
+      edit: t('app.menuEdit'),
+      newFile: t('app.menuNew'),
+      open: t('app.menuOpen'),
+      openRecent: t('app.menuOpenRecent'),
+      noRecentFiles: t('app.menuNoRecentFiles'),
+      clearMenu: t('app.menuClearMenu'),
+      save: t('app.menuSave'),
+      saveAs: t('app.menuSaveAs'),
+      import: t('app.menuImport'),
+      importFromPowerPoint: t('app.menuImportFromPowerPoint'),
+      importFromUrl: t('app.menuImportFromUrl'),
+      importFromMarp: t('app.menuImportFromMarp'),
+      export: t('app.menuExport'),
+      exportPowerpoint: t('app.menuExportPowerpoint'),
+      exportPdf: t('app.menuExportPdf'),
+      exportHtml: t('app.menuExportHtml'),
+      print: t('app.menuPrint'),
+    });
+  }, [recents, stableMenuHandlers, t]);
 
   // File association: open files delivered via double-click / "Open With".
   // On macOS, paths arrive via RunEvent::Opened; on Linux/Windows, via CLI arg

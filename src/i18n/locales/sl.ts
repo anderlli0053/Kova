@@ -312,6 +312,9 @@ const sl: DeepPartial<Messages> = {
     filterPdf: 'PDF',
     filterHtml: 'HTML',
   },
+  macMenu: {
+    present: 'Predstavi',
+  },
   settings: {
     windowTitle: 'Nastavitve',
     sectionAppearance: 'Videz',

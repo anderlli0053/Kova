@@ -312,6 +312,9 @@ const en = {
     filterPdf: 'PDF',
     filterHtml: 'HTML',
   },
+  macMenu: {
+    present: 'Present',
+  },
   settings: {
     windowTitle: 'Settings',
     sectionAppearance: 'Appearance',

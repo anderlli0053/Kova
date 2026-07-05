@@ -29,16 +29,38 @@ export interface MacMenuHandlers {
   openSettings: () => void;
 }
 
-export async function buildMacMenu(h: MacMenuHandlers, recents: string[]): Promise<void> {
+export interface MacMenuLabels {
+  present: string;
+  file: string;
+  edit: string;
+  newFile: string;
+  open: string;
+  openRecent: string;
+  noRecentFiles: string;
+  clearMenu: string;
+  save: string;
+  saveAs: string;
+  import: string;
+  importFromPowerPoint: string;
+  importFromUrl: string;
+  importFromMarp: string;
+  export: string;
+  exportPowerpoint: string;
+  exportPdf: string;
+  exportHtml: string;
+  print: string;
+}
+
+export async function buildMacMenu(h: MacMenuHandlers, recents: string[], labels: MacMenuLabels): Promise<void> {
   const version = await getVersion().catch(() => '');
 
   const recentItems = recents.length
     ? [
         ...recents.map((p) => ({ text: recentFileMenuLabel(p, recents), action: () => h.openRecent(p) })),
         { item: 'Separator' as const },
-        { text: 'Clear Menu', action: () => h.clearRecent() },
+        { text: labels.clearMenu, action: () => h.clearRecent() },
       ]
-    : [{ text: 'No Recent Files', enabled: false }];
+    : [{ text: labels.noRecentFiles, enabled: false }];
 
   const menu = await Menu.new({
     items: [
@@ -59,38 +81,38 @@ export async function buildMacMenu(h: MacMenuHandlers, recents: string[]): Promi
         ],
       }),
       await Submenu.new({
-        text: 'File',
+        text: labels.file,
         items: [
-          { text: 'New', accelerator: 'CmdOrCtrl+N', action: () => h.newFile() },
-          { text: 'Open…', accelerator: 'CmdOrCtrl+O', action: () => h.openFile() },
-          await Submenu.new({ text: 'Open Recent', items: recentItems }),
+          { text: labels.newFile, accelerator: 'CmdOrCtrl+N', action: () => h.newFile() },
+          { text: labels.open, accelerator: 'CmdOrCtrl+O', action: () => h.openFile() },
+          await Submenu.new({ text: labels.openRecent, items: recentItems }),
           { item: 'Separator' },
-          { text: 'Save', accelerator: 'CmdOrCtrl+S', action: () => h.save() },
-          { text: 'Save As…', accelerator: 'CmdOrCtrl+Shift+S', action: () => h.saveAs() },
+          { text: labels.save, accelerator: 'CmdOrCtrl+S', action: () => h.save() },
+          { text: labels.saveAs, accelerator: 'CmdOrCtrl+Shift+S', action: () => h.saveAs() },
           await Submenu.new({
-            text: 'Import',
+            text: labels.import,
             items: [
-              { text: 'From PowerPoint…', action: () => h.import() },
-              { text: 'From URL…', action: () => h.importUrl() },
-              { text: 'From Marp…', action: () => h.importMarp() },
+              { text: labels.importFromPowerPoint, action: () => h.import() },
+              { text: labels.importFromUrl, action: () => h.importUrl() },
+              { text: labels.importFromMarp, action: () => h.importMarp() },
             ],
           }),
           { item: 'Separator' },
           await Submenu.new({
-            text: 'Export',
+            text: labels.export,
             items: [
-              { text: 'PowerPoint (.pptx)', action: () => h.export() },
-              { text: 'PDF (.pdf)', action: () => h.exportPdf() },
-              { text: 'HTML (.html)', action: () => h.exportHtml() },
+              { text: labels.exportPowerpoint, action: () => h.export() },
+              { text: labels.exportPdf, action: () => h.exportPdf() },
+              { text: labels.exportHtml, action: () => h.exportHtml() },
             ],
           }),
-          { text: 'Print…', accelerator: 'CmdOrCtrl+P', action: () => h.print() },
+          { text: labels.print, accelerator: 'CmdOrCtrl+P', action: () => h.print() },
           { item: 'Separator' },
           { item: 'Quit' },
         ],
       }),
       await Submenu.new({
-        text: 'Edit',
+        text: labels.edit,
         items: [
           { item: 'Undo' },
           { item: 'Redo' },
@@ -105,7 +127,7 @@ export async function buildMacMenu(h: MacMenuHandlers, recents: string[]): Promi
         text: 'View',
         items: [
           { text: 'Toggle Inspector', action: () => h.toggleInspector() },
-          { text: 'Present', accelerator: 'F5', action: () => h.present() },
+          { text: labels.present, accelerator: 'F5', action: () => h.present() },
           { item: 'Separator' },
           { item: 'Fullscreen' },
         ],
