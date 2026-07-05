@@ -560,18 +560,23 @@ function BspLayout({ slide }: { slide: Slide }) {
     rightGroups = groups.slice(1);
   }
 
+  // Text panes top-align like every other text-holding layout (split, title-content,
+  // two-column); non-text panes (image/chart/table) stay vertically centered for balance.
+  const paneClass = (g: SlideElement[]) => 'sl-bsp__pane' + (isGroupPureText(g) ? ' sl-bsp__pane--text' : '');
+  const subpaneClass = (g: SlideElement[]) => 'sl-bsp__subpane' + (isGroupPureText(g) ? ' sl-bsp__pane--text' : '');
+
   return (
     <div className="sl-bsp">
       {slide.title && <div className="sl-heading sl-bsp__title">{slide.title}</div>}
       <div className="sl-bsp__body">
-        <OverflowPane className="sl-bsp__pane" elements={leftGroup} />
+        <OverflowPane className={paneClass(leftGroup)} elements={leftGroup} />
         <div className="sl-bsp__divider" />
         {rightGroups.length === 1 ? (
-          <OverflowPane className="sl-bsp__pane" elements={rightGroups[0]} />
+          <OverflowPane className={paneClass(rightGroups[0])} elements={rightGroups[0]} />
         ) : (
           <div className="sl-bsp__right">
             {rightGroups.map((g, i) => (
-              <OverflowPane key={i} className="sl-bsp__subpane" elements={g} />
+              <OverflowPane key={i} className={subpaneClass(g)} elements={g} />
             ))}
           </div>
         )}

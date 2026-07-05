@@ -404,6 +404,8 @@
   min-height: 0;
   position: relative;
 }
+/* Text-only panes top-align to match sl-body/sl-split__right/sl-two-col__col. */
+.sl-bsp__pane--text { justify-content: flex-start; }
 /* ── Grid ────────────────────────────────────────────────────────────────── */
 
 .sl-grid { height: 100%; display: flex; flex-direction: column; }
