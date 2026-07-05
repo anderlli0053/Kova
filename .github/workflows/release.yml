@@ -29,7 +29,7 @@ jobs:
           ## What's new
 
           ### New features
-          - **In-app language switcher, and a Slovenian translation** — a new lightweight i18n layer (Settings > Appearance > Display language) extracts every UI string so the app can ship in more than English; Slovenian is the first community translation (addresses #125; i18n layer by the Kova team; Slovenian translation by @anderlli0053, #126).
+          - **In-app language switcher, and a Slovenian translation** — a new lightweight i18n layer (Settings > Appearance > Display language) extracts every UI string so the app can ship in more than English; Slovenian is the first community translation (addresses #125; Slovenian translation by @anderlli0053, #126).
           - **Nix flake for reproducible builds** — `nix run github:KovaMD/Kova`, `nix profile install`, or `nix develop` for a ready-made dev shell (by @vadika, #122; addresses #9).
 
           ### Bug fixes
