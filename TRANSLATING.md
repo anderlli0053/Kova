@@ -7,10 +7,6 @@ object of English strings, grouped by feature area (`presentation`,
 tree; the app takes care of the rest, including making your language show up
 in **Settings → Appearance → Display language**.
 
-This grew out of [issue #125](https://github.com/KovaMD/Kova/issues/125),
-where a contributor asked how to add a Slovenian translation. If that's you —
-thank you, and here's the walkthrough.
-
 ## Adding a locale
 
 1. **Copy the English file** to `src/i18n/locales/<code>.ts`, using the
