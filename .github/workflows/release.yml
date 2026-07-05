@@ -29,18 +29,15 @@ jobs:
           ## What's new
 
           ### New features
-          - **Duplicate and delete slide from the thumbnail context menu** — right-click a slide thumbnail to duplicate it (preserving hidden markers, speaker notes, and custom elements) or delete it (by @Ayush7614, #111).
-          - **Hide/show slide keyboard shortcut** — toggle a slide's hidden state with Ctrl+Shift+H, configurable via `hide_slide` in keybindings.yaml (by @Ayush7614, #107).
-          - **Open Recent submenu for Windows/Linux** — the File menu now shows recently opened documents on Windows/Linux, matching the existing macOS menu (by @Ayush7614, #106).
+          - **In-app language switcher, and a Slovenian translation** — a new lightweight i18n layer (Settings > Appearance > Display language) extracts every UI string so the app can ship in more than English; Slovenian is the first community translation (addresses #125; i18n layer by the Kova team; Slovenian translation by @anderlli0053, #126).
+          - **Nix flake for reproducible builds** — `nix run github:KovaMD/Kova`, `nix profile install`, or `nix develop` for a ready-made dev shell (by @vadika, #122; addresses #9).
 
           ### Bug fixes
-          - **Fixed files marked dirty just from opening a second document** — the content-sync dispatch used to load a new file into an already-mounted editor was indistinguishable from a real edit, so the file was flagged as changed even with no edits made.
-          - **Fixed `{title}` disappearing from footer/header templates** — decks that set their title via a heading instead of YAML frontmatter had no fallback, so multi-segment footer/header templates silently dropped the title segment (reported by @a1880, #55).
-          - **Fixed Table of Contents not working from the audience screen, and overflowing long agendas** — ToC links only navigated from the preview/presenter view, and long lists overflowed instead of splitting into two columns like elsewhere in the app (reported by @a1880, #57).
-          - **Fixed distorted Mermaid diagrams in PPTX export** — portrait flowcharts were stretched to fill the slide instead of keeping their proportions; PPTX export also now includes the same fade transition used in presentation mode.
-          - **Fixed interface-scale setting clipping the right panel** — at scale >1, WebKit's viewport-unit handling made the app wider than the window, cutting off the inspector panel (by @vadika, #119).
-          - **Fixed lone `\r` line endings still triggering false "unsaved changes"** — classic Mac-style line endings weren't covered by the earlier CRLF dirty-check fix.
-          - **Fixed blockquotes losing lists and inline formatting** — quotes were flattened into a single run-on string, dropping list markers, line breaks, and bold/italic; now preserved in both the generic quote element and the standalone quote layout (reported by @codingThome, #116; fixed by @vadika, #118).
+          - **Fixed Linux AppImage auto-update** — the AppImage is now signed as part of the release pipeline, restoring self-update that had been broken since the earlier EGL-crash workaround shipped (fixes #3).
+          - **Fixed a stray left-margin gap in the editor** that grew or shrank again as the panel was resized, reintroduced after an earlier theme-based fix (relates to #28).
+          - **Fixed `{date}` in footer/header templates showing blank** when the document had no `date:` frontmatter field — it now defaults to today's date like the other template variables do.
+          - **Fixed Enter not confirming a slide-jump** when keystrokes were forwarded from the audience window in dual/mirror presentation mode (fixes #54).
+          - **Fixed Table of Contents overflow on long agendas** — layout was computed before ToC entries were resolved, so it could never switch to the two-column overflow layout used elsewhere (closes #57).
 
           ---
 
