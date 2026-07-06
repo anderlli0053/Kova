@@ -9,21 +9,13 @@ Kova turns plain Markdown into polished slides — with live preview, multiple l
 ## Features
 
 - **Markdown-first** — write slides in plain text, separated by `---`
-- **Auto layout** — title, section, split, two-column, grid, quote, full-bleed, and more
 - **Live preview** — editor and preview stay in sync as you type
-- **Syntax highlighting** — fenced code blocks rendered with highlight.js
-- **Math & LaTeX** — inline and block math via KaTeX (`$...$` and `$$...$$`)
-- **Mermaid diagrams** — pie, bar, line charts and flowcharts inline
+- **Auto layout** — title, section, split, two-column, grid, quote, full-bleed, and more
 - **Themes** — 11 built-in themes, community themes, and custom YAML
-- **Focus mode** — dims non-active slides, collapses side panels
+- **Math, code & diagrams** — KaTeX math, highlight.js syntax highlighting, and Mermaid charts
+- **Rich media** — images, local video, YouTube embeds, and polls
 - **Fullscreen presentation** — speaker notes, slide counter, keyboard and click navigation
 - **PPTX export** — export to PowerPoint (16:9 and 4:3)
-- **Academic references** — cite sources with `!ref[Author, Year. Title]`; renders as small bottom-right text on the slide and exports to PPTX
-- **YouTube & poll embeds** — `!youtube[label](url)` and `!poll[label](url)`
-- **Local video** — `!video[label](path.mp4)` plays an inline file (relative to the document or absolute)
-- **Insert media** — drag-drop, paste, or right-click → Insert → Image or Video; files are copied into `assets/` automatically
-- **File watcher** — reloads automatically when the file is edited externally
-- **Keybindings** — configurable via `~/.config/kova/keybindings.yaml`
 
 ## Download
 
@@ -34,6 +26,7 @@ Kova turns plain Markdown into polished slides — with live preview, multiple l
 | **Linux (Debian/Ubuntu)** | [**.deb package**](https://github.com/KovaMD/Kova/releases/latest/download/Kova_Linux.deb) · [or via package manager](#linux-package-managers) |
 | **Linux (Fedora/RHEL/openSUSE)** | [**.rpm package**](https://github.com/KovaMD/Kova/releases/latest/download/Kova_Linux.rpm) · [or via package manager](#linux-package-managers) |
 | **Linux (AppImage)** | [**.AppImage**](https://github.com/KovaMD/Kova/releases/latest/download/Kova_Linux.AppImage) |
+| **Linux (Flatpak)** | [Install via Flatpak](#linux-package-managers) |
 
 ## Linux package managers
 
