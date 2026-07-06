@@ -39,6 +39,8 @@ export function PresentationOverlay({
   const [laserActive, setLaserActive] = useState(false);
   const [blankMode, setBlankMode] = useState<'black' | 'white' | null>(null);
   const [jumpInput, setJumpInput] = useState<string | null>(null);
+  const jumpInputRef = useRef(jumpInput);
+  jumpInputRef.current = jumpInput;
   const [laserPos, setLaserPos] = useState<{ x: number; y: number } | null>(null);
   const [scale, setScale] = useState(() => {
     // Mirror the CSS: min(100vw, (100vh - HUD_H) * ar.w / ar.h) / SLIDE_W
@@ -132,9 +134,9 @@ export function PresentationOverlay({
           // HTMLInputElement check above returns early); this only fires for
           // synthetic keydowns forwarded from the audience window, whose
           // target is `window` rather than the input element.
-          if (jumpInput !== null) {
+          if (jumpInputRef.current !== null) {
             e.preventDefault(); e.stopPropagation();
-            const n = parseInt(jumpInput, 10);
+            const n = parseInt(jumpInputRef.current, 10);
             if (!isNaN(n)) onNavigate(Math.min(Math.max(n - 1, 0), total - 1));
             setJumpInput(null);
           }
@@ -148,7 +150,7 @@ export function PresentationOverlay({
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [goNext, goPrev, onNavigate, total, onExit, slide, resetIdle, jumpInput]);
+  }, [goNext, goPrev, onNavigate, total, onExit, slide, resetIdle]);
 
   // ── Scroll wheel handler ───────────────────────────────────────────────────
 

@@ -31,6 +31,8 @@ export interface MacMenuHandlers {
 
 export interface MacMenuLabels {
   present: string;
+  view: string;
+  toggleInspector: string;
   file: string;
   edit: string;
   newFile: string;
@@ -124,9 +126,9 @@ export async function buildMacMenu(h: MacMenuHandlers, recents: string[], labels
         ],
       }),
       await Submenu.new({
-        text: 'View',
+        text: labels.view,
         items: [
-          { text: 'Toggle Inspector', action: () => h.toggleInspector() },
+          { text: labels.toggleInspector, action: () => h.toggleInspector() },
           { text: labels.present, accelerator: 'F5', action: () => h.present() },
           { item: 'Separator' },
           { item: 'Fullscreen' },

@@ -59,6 +59,8 @@ export function PresenterOverlay({
   const [laserActive, setLaserActive]   = useState(false);
   const [blankMode, setBlankMode]       = useState<'black' | 'white' | null>(null);
   const [jumpInput, setJumpInput]       = useState<string | null>(null);
+  const jumpInputRef = useRef(jumpInput);
+  jumpInputRef.current = jumpInput;
   const [laserPos, setLaserPos]         = useState<{ x: number; y: number } | null>(null);
   const startTime      = useRef(Date.now());
   const lastWheelTime  = useRef(0);
@@ -191,9 +193,9 @@ export function PresenterOverlay({
           // HTMLInputElement check above returns early); this only fires for
           // synthetic keydowns forwarded from the audience window, whose
           // target is `window` rather than the input element.
-          if (jumpInput !== null) {
+          if (jumpInputRef.current !== null) {
             e.preventDefault(); e.stopPropagation();
-            const n = parseInt(jumpInput, 10);
+            const n = parseInt(jumpInputRef.current, 10);
             if (!isNaN(n)) onNavigate(Math.min(Math.max(n - 1, 0), total - 1));
             setJumpInput(null);
           }
@@ -207,7 +209,7 @@ export function PresenterOverlay({
     };
     window.addEventListener('keydown', handler, true);
     return () => window.removeEventListener('keydown', handler, true);
-  }, [goNext, goPrev, onNavigate, total, onExit, jumpInput]);
+  }, [goNext, goPrev, onNavigate, total, onExit]);
 
   useEffect(() => {
     const handler = (e: WheelEvent) => {

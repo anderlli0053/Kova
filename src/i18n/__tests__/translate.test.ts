@@ -63,7 +63,15 @@ describe('createTranslator — pluralization (Intl.PluralRules)', () => {
     const t = createTranslator(null, 'en');
     expect(t('layout.estimatedMinutes', { count: 1 })).toBe('Est. 1 min');
     expect(t('layout.estimatedMinutes', { count: 2 })).toBe('Est. 2 mins');
-    expect(t('layout.estimatedMinutes', { count: 0 })).toBe('Est. 0 mins');
+    expect(t('layout.estimatedMinutes', { count: 0 })).toBe('Est. 0 min');
+  });
+
+  it('prefers an exact `zero` form over the CLDR-selected category', () => {
+    const t = createTranslator(null, 'en');
+    // English CLDR resolves count=0 to 'other', but estimatedMinutes defines
+    // an explicit `zero` form that should win instead.
+    expect(t('layout.estimatedMinutes', { count: 0 })).toBe('Est. 0 min');
+    expect(t('layout.wordCount', { count: 0 })).toBe('0 words');
   });
 
   // Russian CLDR rule: one -> n%10=1 & n%100!=11; few -> n%10=2..4 & n%100 not 12..14;

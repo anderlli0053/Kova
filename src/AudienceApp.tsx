@@ -8,6 +8,7 @@ import type { Slide, AspectRatio } from './engine/types';
 import type { Theme } from './engine/theme';
 import { registerBundledFonts, registerCachedFont } from './engine/bundledFonts';
 import { I18nProvider, useT } from './i18n';
+import { loadSettings } from './store/settings';
 import './styles/global.css';
 
 export interface PresentInitPayload {
@@ -20,8 +21,9 @@ export interface PresentInitPayload {
 }
 
 export function AudienceApp() {
+  const settings = loadSettings();
   return (
-    <I18nProvider locale="auto">
+    <I18nProvider locale={settings.locale}>
       <AudienceAppInner />
     </I18nProvider>
   );

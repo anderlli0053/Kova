@@ -121,7 +121,7 @@ const en = {
     editorPanelHeader: 'Editor',
     slideCountStatus: 'Slide {{current}} of {{total}}',
     noSlides: 'No slides',
-    estimatedMinutes: { one: 'Est. {{count}} min', other: 'Est. {{count}} mins' },
+    estimatedMinutes: { zero: 'Est. {{count}} min', one: 'Est. {{count}} min', other: 'Est. {{count}} mins' },
     wordCount: '{{count}} words',
     aspectRatioTooltip: 'Aspect ratio: {{current}} — click for {{next}}',
     externalImageWarning: {
@@ -284,12 +284,18 @@ const en = {
     minimise: 'Minimise',
     maximiseRestore: 'Maximise / Restore',
     windowClose: 'Close',
-    exportCompleteWithWarnings: 'Export complete with {{count}} warning(s):\n\n{{warnings}}',
+    exportCompleteWithWarnings: {
+      one: 'Export complete with {{count}} warning:\n\n{{warnings}}',
+      other: 'Export complete with {{count}} warnings:\n\n{{warnings}}',
+    },
     pptxExportFailed: 'PPTX export failed: {{error}}',
     pdfExportFallback: 'Used the basic PDF renderer (native export unavailable); handout/N-up/paper options were not applied.',
     pdfExportFailed: 'PDF export failed:\n{{error}}',
     htmlExportFailed: 'HTML export failed:\n{{error}}',
-    printCompleteWithWarnings: 'Print complete with {{count}} warning(s):\n\n{{warnings}}',
+    printCompleteWithWarnings: {
+      one: 'Print complete with {{count}} warning:\n\n{{warnings}}',
+      other: 'Print complete with {{count}} warnings:\n\n{{warnings}}',
+    },
     marpDetected: 'This looks like a Marp deck.',
     marpConvert: 'Convert to Kova',
     marpImported: { one: 'Imported. {{count}} Marp feature simplified.', other: 'Imported. {{count}} Marp features simplified.' },
@@ -314,6 +320,8 @@ const en = {
   },
   macMenu: {
     present: 'Present',
+    view: 'View',
+    toggleInspector: 'Toggle Inspector',
   },
   settings: {
     windowTitle: 'Settings',

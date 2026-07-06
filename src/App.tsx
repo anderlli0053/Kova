@@ -801,7 +801,7 @@ export default function App() {
 
     setPresentMode(true);
     await getCurrentWindow().setFullscreen(true).catch(() => {});
-  }, [slides, visibleSlides, safeSlideIndex, activeTheme, aspectRatio, docTitle, settings.presentationMode]);
+  }, [slides, visibleSlides, safeSlideIndex, activeTheme, aspectRatio, docTitle, docDate, settings.presentationMode]);
 
   // Prevent display sleep while presenting; release on exit.
   // Covers all exit paths (normal, error, external window close).
@@ -1560,6 +1560,8 @@ export default function App() {
     if (!isMac) return;
     void buildMacMenu(stableMenuHandlers, recents, {
       present: t('macMenu.present'),
+      view: t('macMenu.view'),
+      toggleInspector: t('macMenu.toggleInspector'),
       file: t('app.menuFile'),
       edit: t('app.menuEdit'),
       newFile: t('app.menuNew'),

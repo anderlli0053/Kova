@@ -66,6 +66,11 @@ export function createTranslator(activeMessages: DeepPartial<Messages> | null, l
     if (!isPluralForms(raw)) return interpolate(raw, vars);
 
     const count = typeof vars?.count === 'number' ? vars.count : 0;
+    // Exact-zero override (ICU's `=0` convention): some languages' CLDR rules
+    // never select a distinct category for 0 (e.g. English/Slovenian both
+    // resolve it to `other`), so a `zero` form lets a specific key opt into
+    // singular-style zero text without changing that language's plural rules.
+    if (count === 0 && raw.zero !== undefined) return interpolate(raw.zero, vars);
     const category = rulesForRaw.select(count) as PluralCategory;
     let template = selectPluralForm(raw, category);
     if (template === undefined) {
