@@ -33,7 +33,7 @@ function OverflowPane({ className, elements }: { className: string; elements: Sl
   const t = useT();
   const outerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const { isThumbnail } = useContext(SlideCtx);
+  const { isThumbnail, hideOverflowBadge } = useContext(SlideCtx);
   const fitScaleRef = useRef(1);
   const [fitScale, setFitScale] = useState(1);
 
@@ -95,14 +95,14 @@ function OverflowPane({ className, elements }: { className: string; elements: Sl
       <div ref={innerRef} style={{ transformOrigin: 'top left' }}>
         <Elements elements={elements} />
       </div>
-      {fitScale < 0.99 && !isThumbnail && <div className="sl-overflow-badge">{t('preview.rescaledToFit')}</div>}
+      {fitScale < 0.99 && !isThumbnail && !hideOverflowBadge && <div className="sl-overflow-badge">{t('preview.rescaledToFit')}</div>}
     </div>
   );
 }
 
 // Context passed to child components so they can adapt for thumbnail vs full rendering
-interface SlideCtxValue { isThumbnail: boolean; textColor: string; mermaidInit: string; onDiagramReady?: () => void; onNavigateTo?: (slideIndex: number) => void }
-const SlideCtx = createContext<SlideCtxValue>({ isThumbnail: false, textColor: '#1a1a1a', mermaidInit: '' });
+interface SlideCtxValue { isThumbnail: boolean; hideOverflowBadge: boolean; textColor: string; mermaidInit: string; onDiagramReady?: () => void; onNavigateTo?: (slideIndex: number) => void }
+const SlideCtx = createContext<SlideCtxValue>({ isThumbnail: false, hideOverflowBadge: false, textColor: '#1a1a1a', mermaidInit: '' });
 
 // Strips any `securityLevel` key from a user-supplied `%%{init: {...}}%%` pragma
 // so users cannot downgrade from the application's enforced 'strict' setting.
@@ -232,11 +232,12 @@ interface Props {
   docDate?: string;
   scale?: number;
   isThumbnail?: boolean;
+  hideOverflowBadge?: boolean;
   onAllDiagramsReady?: () => void;
   onNavigateTo?: (slideIndex: number) => void;
 }
 
-export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, totalSlides, docTitle = '', docDate = '', scale = 1, isThumbnail: isThumbnailProp, onAllDiagramsReady, onNavigateTo }: Props) {
+export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, totalSlides, docTitle = '', docDate = '', scale = 1, isThumbnail: isThumbnailProp, hideOverflowBadge = false, onAllDiagramsReady, onNavigateTo }: Props) {
   const vars = themeToVars(theme);
 
   // Signal export-readiness when all Mermaid diagrams on this slide have rendered.
@@ -267,8 +268,8 @@ export function SlideRenderer({ slide, theme = DEFAULT_THEME, slideNumber, total
   const showFloatingLogo = theme.logo && !logoInHeader && !logoInFooter;
 
   const ctxValue = useMemo<SlideCtxValue>(
-    () => ({ isThumbnail: isThumbnailProp ?? scale !== 1, textColor: theme.colors.text, mermaidInit: buildMermaidInit(theme), onDiagramReady: onAllDiagramsReady ? onDiagramReady : undefined, onNavigateTo }),
-    [isThumbnailProp, scale, theme, onAllDiagramsReady, onDiagramReady, onNavigateTo],
+    () => ({ isThumbnail: isThumbnailProp ?? scale !== 1, hideOverflowBadge, textColor: theme.colors.text, mermaidInit: buildMermaidInit(theme), onDiagramReady: onAllDiagramsReady ? onDiagramReady : undefined, onNavigateTo }),
+    [isThumbnailProp, scale, hideOverflowBadge, theme, onAllDiagramsReady, onDiagramReady, onNavigateTo],
   );
 
   return (
@@ -500,7 +501,7 @@ function autoSplitElements(elements: SlideElement[]): [SlideElement[], SlideElem
     }
     return [
       [{ ...toc, entries: entries.slice(0, mid) }],
-      [{ ...toc, entries: entries.slice(mid) }],
+      [{ ...toc, entries: entries.slice(mid), numberStart: mid }],
     ];
   }
   // Multiple elements: split at midpoint
@@ -791,10 +792,12 @@ function TocElement({ el }: { el: Extract<SlideElement, { type: 'toc' }> }) {
   if (el.entries.length === 0) {
     return <p className="sl-para" style={{ opacity: 0.5, fontStyle: 'italic' }}>{t('preview.noTitledSlidesFound')}</p>;
   }
+  const numberStart = el.numberStart ?? 0;
   return (
-    <ol className="sl-list">
+    <ul className="sl-list sl-list--toc">
       {el.entries.map((entry, i) => (
-        <li key={i}>
+        <li key={i} className="sl-toc-entry">
+          <span className="sl-toc-num">{numberStart + i + 1}.</span>
           {interactive ? (
             <button className="sl-toc-link" onClick={(e) => { e.stopPropagation(); onNavigateTo!(entry.index); }}>
               {entry.title}
@@ -804,7 +807,7 @@ function TocElement({ el }: { el: Extract<SlideElement, { type: 'toc' }> }) {
           )}
         </li>
       ))}
-    </ol>
+    </ul>
   );
 }
 

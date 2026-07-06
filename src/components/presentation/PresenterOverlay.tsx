@@ -256,6 +256,7 @@ export function PresenterOverlay({
                 totalSlides={total}
                 docTitle={docTitle}
                 docDate={docDate}
+                hideOverflowBadge
                 onNavigateTo={handleNavigateTo}
               />
             </ScaledSlideBox>
@@ -299,6 +300,7 @@ export function PresenterOverlay({
                       totalSlides={total}
                       docTitle={docTitle}
                       docDate={docDate}
+                      hideOverflowBadge
                     />
                   </ScaledSlideBox>
                 </div>

@@ -34,7 +34,7 @@ export type SlideElement =
   | { type: 'poll';     label: string; url: string }
   | { type: 'progress'; label: string; value: number }
   | { type: 'column-break' }
-  | { type: 'toc'; entries: Array<{ title: string; index: number }> };
+  | { type: 'toc'; entries: Array<{ title: string; index: number }>; numberStart?: number };
 
 export interface Slide {
   index: number;
