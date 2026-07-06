@@ -902,6 +902,54 @@ function hljsHtmlToRuns(html: string): PptxRun[] {
   return runs;
 }
 
+// ── Callout/admonition box (mirrors .sl-callout in SlideRenderer.css) ─────────
+// Colors are fixed per type, not theme-derived — same rationale as the web
+// renderer: users expect note=blue/warning=amber/danger=red regardless of theme.
+const CALLOUT_COLORS: Record<string, string> = {
+  note: '#448AFF',
+  info: '#00B8D4',
+  tip: '#00C853',
+  warning: '#FF9100',
+  danger: '#FF5252',
+};
+
+function addCalloutBlock(s: PS, el: Extract<SlideElement, { type: 'blockquote' }>, t: Theme, area: Area) {
+  const color = CALLOUT_COLORS[el.calloutType ?? 'note'] ?? CALLOUT_COLORS.note;
+  const BAR_W = 0.06;
+  const PAD   = 0.15;
+
+  s.addShape('rect', {
+    x: area.x, y: area.y, w: area.w, h: area.h,
+    fill: { color: hex(t.colors.background) },
+    line: { color: hex(color), width: 0.75, transparency: 60 },
+  });
+  s.addShape('rect', {
+    x: area.x, y: area.y, w: BAR_W, h: area.h,
+    fill: { color: hex(color) },
+    line: { type: 'none' },
+  });
+
+  const titleH = 0.35;
+  s.addText(el.title ?? '', {
+    x: area.x + BAR_W + PAD, y: area.y + PAD * 0.5, w: area.w - BAR_W - PAD * 1.5, h: titleH,
+    fontSize: 15, bold: true,
+    color: hex(color),
+    fontFace: firstFont(t.fonts.body),
+    valign: 'top',
+  });
+
+  if (el.text.trim()) {
+    s.addText(el.text, {
+      x: area.x + BAR_W + PAD, y: area.y + PAD * 0.5 + titleH, w: area.w - BAR_W - PAD * 1.5, h: area.h - titleH - PAD,
+      fontSize: 14,
+      color: hex(t.colors.text),
+      fontFace: firstFont(t.fonts.body),
+      valign: 'top', wrap: true,
+      shrinkText: true,
+    });
+  }
+}
+
 // ── Styled code block (reused by addCodeSlide and addElements) ────────────────
 
 function addCodeBlock(s: PS, value: string, lang: string | undefined, t: Theme, area: Area) {
@@ -1002,6 +1050,12 @@ function addElements(s: PS, elements: SlideElement[], t: Theme, area: Area, warn
     return;
   }
 
+  // Single callout — render as a bordered/accent-barred box, not a plain quote
+  if (elements.length === 1 && elements[0].type === 'blockquote' && elements[0].calloutType) {
+    addCalloutBlock(s, elements[0], t, area);
+    return;
+  }
+
   // Build a text run array for all text-based elements
   const runs: Array<{ text: string; options?: Record<string, unknown> }> = [];
 
@@ -1037,15 +1091,26 @@ function addElements(s: PS, elements: SlideElement[], t: Theme, area: Area, warn
         break;
 
       case 'blockquote':
-        runs.push({
-          text: `“${el.text}”`,
-          options: { italic: true, fontSize: 18, breakLine: true },
-        });
-        if (el.attribution) {
+        if (el.calloutType) {
+          const color = CALLOUT_COLORS[el.calloutType] ?? CALLOUT_COLORS.note;
           runs.push({
-            text: `— ${el.attribution}`,
-            options: { fontSize: 14, color: hex(t.colors.accent), breakLine: true },
+            text: el.title ?? '',
+            options: { bold: true, fontSize: 16, color: hex(color), breakLine: true, paraSpaceAfter: 2 },
           });
+          if (el.text.trim()) {
+            runs.push({ text: el.text, options: { fontSize: 16, breakLine: true, paraSpaceAfter: 4 } });
+          }
+        } else {
+          runs.push({
+            text: `“${el.text}”`,
+            options: { italic: true, fontSize: 18, breakLine: true },
+          });
+          if (el.attribution) {
+            runs.push({
+              text: `— ${el.attribution}`,
+              options: { fontSize: 14, color: hex(t.colors.accent), breakLine: true },
+            });
+          }
         }
         break;
 

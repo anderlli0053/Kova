@@ -185,6 +185,41 @@ describe('element parsing', () => {
     expect(bq?.type === 'blockquote' && bq.html).toContain('<strong>bold</strong>');
   });
 
+  it('parses a callout with default title', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n> [!warning]\n> Be careful here\n'));
+    const bq = slides[0].elements.find((e) => e.type === 'blockquote');
+    expect(bq?.type === 'blockquote' && bq.calloutType).toBe('warning');
+    expect(bq?.type === 'blockquote' && bq.title).toBe('Warning');
+    expect(bq?.type === 'blockquote' && bq.text).toContain('Be careful here');
+  });
+
+  it('parses a callout with a custom title', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n> [!tip] Pro move\n> Do this instead\n'));
+    const bq = slides[0].elements.find((e) => e.type === 'blockquote');
+    expect(bq?.type === 'blockquote' && bq.calloutType).toBe('tip');
+    expect(bq?.type === 'blockquote' && bq.title).toBe('Pro move');
+  });
+
+  it('resolves callout aliases to a canonical style', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n> [!caution] Heads up\n> Watch out\n'));
+    const bq = slides[0].elements.find((e) => e.type === 'blockquote');
+    expect(bq?.type === 'blockquote' && bq.calloutType).toBe('warning');
+    expect(bq?.type === 'blockquote' && bq.title).toBe('Heads up');
+  });
+
+  it('falls back to note style for unknown callout types', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n> [!custom]\n> Something else\n'));
+    const bq = slides[0].elements.find((e) => e.type === 'blockquote');
+    expect(bq?.type === 'blockquote' && bq.calloutType).toBe('note');
+    expect(bq?.type === 'blockquote' && bq.title).toBe('Custom');
+  });
+
+  it('does not treat a plain blockquote as a callout', () => {
+    const { slides } = parseDocument(doc('## Slide\n\n> Just a quote\n'));
+    const bq = slides[0].elements.find((e) => e.type === 'blockquote');
+    expect(bq?.type === 'blockquote' && bq.calloutType).toBeUndefined();
+  });
+
   it('parses GFM table', () => {
     const { slides } = parseDocument(doc('## Slide\n\n| A | B |\n|---|---|\n| 1 | 2 |\n'));
     const table = slides[0].elements.find((e) => e.type === 'table');

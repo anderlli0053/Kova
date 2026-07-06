@@ -234,6 +234,18 @@ function convertRoot(tree: Root, placeholders: Map<number, SlideElement>): Conve
 
       case 'blockquote': {
         const bq = node as Blockquote;
+        const callout = extractCallout(bq);
+        if (callout) {
+          const bodyBq: Blockquote = { ...bq, children: callout.children as Blockquote['children'] };
+          elements.push({
+            type: 'blockquote',
+            text: toString(bodyBq),
+            html: blockquoteInnerHtml(bodyBq),
+            calloutType: callout.calloutType,
+            title: callout.title,
+          });
+          break;
+        }
         // Attribution (— Author on the last line) applies to a single-paragraph
         // quote; the body keeps its inline formatting via `html`. Structured
         // quotes (lists, multiple blocks) render their markup through `html` too.
@@ -334,6 +346,63 @@ function convertListItem(item: MdastListItem): ListItem {
     html,
     children: subList ? subList.children.map(convertListItem) : [],
   };
+}
+
+// Obsidian/GitHub-style callout marker: the first line of a blockquote reading
+// `[!type]` (optionally `[!type] Custom Title`) turns it into an admonition box
+// instead of a plain quote. `type` is folded to one of five canonical styles via
+// CALLOUT_ALIASES so common synonyms (caution, error, hint, ...) still render
+// sensibly instead of falling back to a generic look.
+const CALLOUT_STYLES = new Set(['note', 'tip', 'warning', 'danger', 'info']);
+const CALLOUT_ALIASES: Record<string, string> = {
+  hint: 'tip', important: 'tip', success: 'tip', check: 'tip', done: 'tip',
+  caution: 'warning', attention: 'warning',
+  error: 'danger', failure: 'danger', fail: 'danger', bug: 'danger', missing: 'danger',
+  question: 'info', help: 'info', faq: 'info',
+  abstract: 'note', summary: 'note', tldr: 'note', quote: 'note', cite: 'note', example: 'note',
+};
+const CALLOUT_RE = /^\[!([A-Za-z][\w-]*)\]([+-]?)\s*(.*)$/;
+
+function resolveCalloutStyle(rawType: string): string {
+  const key = rawType.toLowerCase();
+  return CALLOUT_STYLES.has(key) ? key : (CALLOUT_ALIASES[key] ?? 'note');
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Detects a `[!type]` marker on the blockquote's first line and splits it off,
+// returning the resolved style, display title, and the remaining body nodes.
+// Returns null for a plain (non-callout) blockquote.
+function extractCallout(bq: Blockquote): { calloutType: string; title: string; children: Node[] } | null {
+  const first = bq.children[0];
+  if (!first || first.type !== 'paragraph') return null;
+  const kids = [...(first as Paragraph).children] as any[];
+  const firstKid = kids[0];
+  if (!firstKid || firstKid.type !== 'text') return null;
+
+  const value = firstKid.value as string;
+  const nl = value.indexOf('\n');
+  const firstLine = nl < 0 ? value : value.slice(0, nl);
+  const m = firstLine.match(CALLOUT_RE);
+  if (!m) return null;
+
+  const calloutType = resolveCalloutStyle(m[1]);
+  const title = m[3].trim() || capitalize(m[1]);
+  const rest = nl < 0 ? '' : value.slice(nl + 1);
+
+  let children: Node[];
+  if (rest === '' && kids.length === 1) {
+    // Marker line was the entire first paragraph — body is whatever follows it.
+    children = bq.children.slice(1);
+  } else {
+    const newFirstKid = { ...firstKid, value: rest };
+    const newPara: Paragraph = { ...(first as Paragraph), children: [newFirstKid, ...kids.slice(1)] };
+    children = [newPara, ...bq.children.slice(1)];
+  }
+
+  return { calloutType, title, children };
 }
 
 // Blockquote children → HTML, preserving paragraphs and (nested) lists.

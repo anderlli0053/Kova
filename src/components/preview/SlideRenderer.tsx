@@ -689,6 +689,45 @@ function Elements({ elements }: { elements: SlideElement[] }) {
   );
 }
 
+// One inline SVG per canonical callout style (see resolveCalloutStyle in the
+// parser) — no icon library is used elsewhere in the app, so these follow the
+// same hand-drawn-inline convention as InfoBanner's dismiss icon.
+const CALLOUT_ICONS: Record<string, React.ReactNode> = {
+  note: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 4h13l3 3v13H4z" />
+      <path d="M8 9h8M8 13h8M8 17h5" />
+    </svg>
+  ),
+  info: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="11" x2="12" y2="16" />
+      <circle cx="12" cy="7.5" r="0.5" fill="currentColor" />
+    </svg>
+  ),
+  tip: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 18h6M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6v.5h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3Z" />
+    </svg>
+  ),
+  warning: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3 2 20h20L12 3Z" />
+      <line x1="12" y1="10" x2="12" y2="15" />
+      <circle cx="12" cy="17.5" r="0.5" fill="currentColor" />
+    </svg>
+  ),
+  danger: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3h8l5 5v8l-5 5H8l-5-5V8l5-5Z" />
+      <line x1="12" y1="8" x2="12" y2="13" />
+      <circle cx="12" cy="16" r="0.5" fill="currentColor" />
+    </svg>
+  ),
+};
+
 function ElementNode({ el }: { el: SlideElement }) {
   switch (el.type) {
     case 'paragraph':
@@ -709,6 +748,19 @@ function ElementNode({ el }: { el: SlideElement }) {
     }
 
     case 'blockquote':
+      if (el.calloutType) {
+        return (
+          <div className={`sl-callout sl-callout--${el.calloutType}`}>
+            <div className="sl-callout__title">
+              <span className="sl-callout__icon">{CALLOUT_ICONS[el.calloutType]}</span>
+              {el.title}
+            </div>
+            {el.html && (
+              <div className="sl-callout__body" dangerouslySetInnerHTML={{ __html: el.html }} />
+            )}
+          </div>
+        );
+      }
       return (
         <blockquote className="sl-blockquote">
           {el.html

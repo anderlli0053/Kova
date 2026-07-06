@@ -111,6 +111,11 @@ describe('no-title layouts', () => {
     expect(detectLayout([bq], 0, false)).toBe('quote');
   });
 
+  it('no title + single callout → not quote', () => {
+    const callout: SlideElement = { type: 'blockquote', text: 'Careful', calloutType: 'warning', title: 'Warning' };
+    expect(detectLayout([callout], 0, false)).not.toBe('quote');
+  });
+
   it('no title + no elements → blank', () => {
     expect(detectLayout([], 0, false)).toBe('blank');
   });

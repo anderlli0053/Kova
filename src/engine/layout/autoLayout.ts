@@ -118,7 +118,9 @@ export function detectLayout(
   if (!hasTitle) {
     if (bodyElements.length === 1) {
       if (bodyElements[0].type === 'image') return 'full-bleed';
-      if (bodyElements[0].type === 'blockquote') return 'quote';
+      // Callouts (blockquotes with a [!type] marker) keep their compact box
+      // styling rather than being blown up into a full-slide pull quote.
+      if (bodyElements[0].type === 'blockquote' && !bodyElements[0].calloutType) return 'quote';
     }
     if (bodyElements.length === 0) return 'blank';
   }
