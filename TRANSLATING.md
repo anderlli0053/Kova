@@ -141,6 +141,18 @@ in **Settings → Appearance → Display language**.
 7. **Open a PR.** Mention in the description which sections (if any) you left
    in English, so a reviewer can spot-check they still read sensibly.
 
+## Using an LLM to translate
+
+We have no problem with using an LLM (ChatGPT, Claude, etc.) to generate a
+first pass at a translation — it's a reasonable way to get unstuck on a
+language you don't natively speak. But an LLM-generated translation file
+**must be sanity-checked by an actual speaker of that language** before it's
+opened as a PR. LLMs are fluent but not infallible, and a translation that
+reads plausibly to a non-speaker can still contain mistakes a native speaker
+would catch immediately (wrong register, unnatural phrasing, mistranslated
+idioms, wrong plural forms). Mention in the PR description that a locale was
+LLM-assisted and who checked it.
+
 ## What not to do
 
 - Don't edit `src/i18n/en.ts` as part of a translation PR — it's the
