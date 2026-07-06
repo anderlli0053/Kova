@@ -104,13 +104,12 @@ jobs:
           rm -rf squashfs-root
 
       # Stripping+repacking above invalidates any signature Tauri computed at
-      # build time, so sign the final bytes directly instead — the same
-      # after-the-fact pattern fix-latest-json.yml already uses in production
-      # to re-sign a DMG/MSI: `tauri signer sign` reads the key/password from
-      # the environment and writes "<file>.sig" next to it. Builds a
-      # standalone latest.json pointing at this tag's AppImage so a test build
-      # of Kova (pointed at this tag via a --config endpoint override) can
-      # exercise a real self-update end-to-end before this lands in release.yml.
+      # build time, so sign the final bytes directly instead: `tauri signer
+      # sign` reads the key/password from the environment and writes
+      # "<file>.sig" next to it. Builds a standalone latest.json pointing at
+      # this tag's AppImage so a test build of Kova (pointed at this tag via
+      # a --config endpoint override) can exercise a real self-update
+      # end-to-end before this lands in release.yml.
       - name: Sign repacked AppImage
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
