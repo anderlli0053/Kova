@@ -177,8 +177,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder rsync
+          curl -fsSL https://dl.flathub.org/repo/flathub.gpg -o /tmp/flathub.gpg
           flatpak remote-add --user --if-not-exists flathub \
-            https://dl.flathub.org/repo/ --gpg-import <(curl -fsSL https://dl.flathub.org/repo/flathub.gpg)
+            https://dl.flathub.org/repo/ --gpg-import=/tmp/flathub.gpg
           flatpak install --user -y --noninteractive flathub org.gnome.Platform//49 org.gnome.Sdk//49
 
       - name: Resolve release tag
