@@ -29,15 +29,19 @@ jobs:
           ## What's new
 
           ### New features
-          - **In-app language switcher, and a Slovenian translation** — a new lightweight i18n layer (Settings > Appearance > Display language) extracts every UI string so the app can ship in more than English; Slovenian is the first community translation (addresses #125; Slovenian translation by @anderlli0053, #126).
-          - **Nix flake for reproducible builds** — `nix run github:KovaMD/Kova`, `nix profile install`, or `nix develop` for a ready-made dev shell (by @vadika, #122; addresses #9).
+          - **Callout / admonition blocks** — Obsidian/GitHub-style `[!note]`, `[!warning]`, etc. blocks for calling out important content, extendable via CSS (requested by @codingThome, #120).
+          - **Self-hosted Flatpak packaging** — signed, GPG-verified Flatpak release published to `flatpak.kova.md` alongside the existing deb/rpm repos (by @vadika, #123; addresses #9).
+          - **Release binary attestation** — published macOS/Windows/Linux binaries are now attested to the commit and build that produced them; see the new `SECURITY.md` for how to verify a download and how to report a vulnerability (by @vadika, #124; addresses #121, reported by @a1880).
+          - **German translation** — Kova is now available in German (contributed by @a1880).
+          - **Locale-aware fallback date** — the `{date}` shown when a deck has no `date:` frontmatter now follows the field order (day/month/year vs. month/day/year) of the app's selected display language instead of always showing ISO `YYYY-MM-DD` (addresses #55, reported by @a1880).
 
           ### Bug fixes
-          - **Fixed Linux AppImage auto-update** — the AppImage is now signed as part of the release pipeline, restoring self-update that had been broken since the earlier EGL-crash workaround shipped (reported by @frigaut, #3).
-          - **Fixed a stray left-margin gap in the editor** that grew or shrank again as the panel was resized, reintroduced after an earlier theme-based fix (reported by @a1880, #28).
-          - **Fixed `{date}` in footer/header templates showing blank** when the document had no `date:` frontmatter field — it now defaults to today's date like the other template variables do.
-          - **Fixed Enter not confirming a slide-jump** when keystrokes were forwarded from the audience window in dual/mirror presentation mode (reported by @a1880, #54).
-          - **Fixed Table of Contents overflow on long agendas** — layout was computed before ToC entries were resolved, so it could never switch to the two-column overflow layout used elsewhere (reported by @a1880, #57).
+          - **Fixed Table of Contents numbering restarting at 1** in the second column of a split ToC, misaligned numbers on wrapped entries, and the "rescaled to fit" badge incorrectly showing during a live presentation (reported by @a1880, #127).
+          - **Finished translating the native macOS menu bar** (File/Edit/Present/View) and fixed the in-window toolbar and menus always showing English regardless of the selected display language.
+          - **Fixed several Slovenian translation gaps** introduced by the v0.6.12 i18n migration — missing plural forms for counts of 2–4, a zero-count ("Est. 0 min") falling back to the wrong grammatical form, and the audience/secondary-monitor window ignoring the chosen display language.
+          - **Fixed the presenter/audience date and title going out of sync** and PPTX exports leaving `{date}` blank when a deck had no frontmatter date.
+          - **Fixed slide-jump keystrokes being dropped intermittently** during dual/mirror presentation mode.
+          - **Fixed text/chart slides being vertically centered** instead of top-aligned like other layouts.
 
           ---
 
@@ -47,7 +51,7 @@ jobs:
           |---|---|---|
           | **macOS** (Apple Silicon + Intel) | `.dmg` | Signed and notarised — double-click to install |
           | **Windows 10/11** | `.msi` or `_x64-setup.exe` | Click **More info → Run anyway** if SmartScreen appears (app is unsigned) |
-          | **Linux** | `.deb` (Debian/Ubuntu) or `.rpm` (Fedora/RHEL/openSUSE) | Install via your package manager |
+          | **Linux** | `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL/openSUSE), or `.flatpakref` | Install via your package manager |
           | **Linux AppImage** | `.AppImage` | Graphics libs stripped for compatibility with Arch/Fedora/etc. Supports auto-update. |
 
           > **Beta release** — expect rough edges. Please report bugs via [Issues](../../issues).
