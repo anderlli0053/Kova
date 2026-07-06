@@ -3,7 +3,7 @@
 // DOM) so it's unit-tested.
 import type { AspectRatio } from '../types';
 
-export type PaperSize = 'a4' | 'letter';
+export type PaperSize = 'a4' | 'letter' | 'slide';
 
 export interface PdfExportOpts {
   perPage?: number;                 // slides per page: 1 (default), 2, 4, 6
@@ -19,7 +19,7 @@ const GAP_MM     = 6;               // gap between N-up cells / slide↔notes
 const NOTES_FRAC = 0.32;            // share of content height for the notes band
 
 // Portrait dimensions (mm); pages are laid out landscape.
-const PAPER: Record<PaperSize, { w: number; h: number }> = {
+const PAPER: Record<Exclude<PaperSize, 'slide'>, { w: number; h: number }> = {
   a4:     { w: 210, h: 297 },
   letter: { w: 216, h: 279 },
 };
@@ -64,7 +64,15 @@ export function planPage(ar: AspectRatio, opts: PdfExportOpts): PagePlan {
       cellWpx: SLIDE_PX_W, cellHpx: sh, slideNativeHpx: sh, slideScale: 1, notesTopPx: 0,
     };
   }
-  const paper = PAPER[opts.paper ?? 'a4'];
+  // 'slide' paper ("match slide size") is only meaningful for a plain 1-up
+  // page — it degenerates to a single slide's own bounding box, which is too
+  // small to hold an N-up grid or a notes band. Reuse the fullBleed layout
+  // when compatible; otherwise fall back to A4 so nup/notes still work.
+  if (opts.paper === 'slide' && (opts.perPage ?? 1) <= 1 && !notesEnabled(opts)) {
+    return planPage(ar, { ...opts, fullBleed: true });
+  }
+
+  const paper = PAPER[opts.paper === 'slide' ? 'a4' : (opts.paper ?? 'a4')];
   // Landscape: slides are wide, so swap paper w/h.
   const pageWmm = paper.h, pageHmm = paper.w;
   const pageWpx = Math.round(pageWmm * PX_PER_MM);

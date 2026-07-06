@@ -383,6 +383,7 @@ const de: DeepPartial<Messages> = {
     pdfPageSizeDescription: 'Papierformat für den PDF-Export. Seiten werden im Querformat angeordnet.', // Paper size for PDF export. Pages are laid out landscape.
     pageSizeA4: 'A4', // A4
     pageSizeLetter: 'Letter', // Letter
+    pageSizeSlide: 'Foliengröße', // Match slide size
     sectionPresentation: 'Präsentation', // Presentation
     displayMode: 'Anzeigemodus', // Display mode
     displayModeDescription: 'Erkennt zum Präsentationszeitpunkt automatisch angeschlossene Bildschirme — Referentenansicht mit zwei Bildschirmen, falls ein zweiter Bildschirm gefunden wird, sonst Einzelbildschirm. Spiegeln zeigt dieselbe Folie auf beiden Bildschirmen.', // Auto detects connected displays at presentation time — dual presenter view if a second screen is found, single screen otherwise. Mirror shows the same slide on both displays.

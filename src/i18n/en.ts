@@ -364,6 +364,7 @@ const en = {
     pdfPageSizeDescription: 'Paper size for PDF export. Pages are laid out landscape.',
     pageSizeA4: 'A4',
     pageSizeLetter: 'Letter',
+    pageSizeSlide: 'Match slide size',
     sectionPresentation: 'Presentation',
     displayMode: 'Display mode',
     displayModeDescription: 'Auto detects connected displays at presentation time — dual presenter view if a second screen is found, single screen otherwise. Mirror shows the same slide on both displays.',

@@ -52,7 +52,7 @@ export interface AppSettings {
   // Presentation defaults
   defaultThemeId: string;
   // Export
-  pdfPageSize: 'a4' | 'letter';
+  pdfPageSize: 'a4' | 'letter' | 'slide';
   // Startup
   startupBehavior: StartupBehavior;
 }

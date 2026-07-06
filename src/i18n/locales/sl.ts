@@ -380,6 +380,7 @@ const sl: DeepPartial<Messages> = {
     pdfPageSizeDescription: 'Velikost papirja za izvoz PDF. Strani so postavljene ležeče.',
     pageSizeA4: 'A4',
     pageSizeLetter: 'Pismo',
+    pageSizeSlide: 'Velikost diapozitiva',
     sectionPresentation: 'Predstavitev',
     displayMode: 'Način prikaza',
     displayModeDescription: 'Samodejno zazna priključene zaslone med predstavitvijo — pogled dveh predstaviteljev, če je najden drugi zaslon, sicer pa samo en zaslon. Zrcalo prikazuje isti diapozitiv na obeh zaslonih.',

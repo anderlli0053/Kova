@@ -626,6 +626,7 @@ export function SettingsModal({ settings, availableUpdate, allThemes, isDirty, s
             {([
               { value: 'a4',     label: t('settings.pageSizeA4')     },
               { value: 'letter', label: t('settings.pageSizeLetter') },
+              { value: 'slide',  label: t('settings.pageSizeSlide')  },
             ] as { value: AppSettings['pdfPageSize']; label: string }[]).map(({ value, label }) => (
               <button key={value} type="button" onClick={() => set('pdfPageSize', value)}
                 style={groupBtnStyle(settings.pdfPageSize === value)}

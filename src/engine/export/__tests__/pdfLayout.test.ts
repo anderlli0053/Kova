@@ -59,4 +59,25 @@ describe('pdfLayout', () => {
     expect(p.cols).toBe(1);
     expect(p.rows).toBe(1);
   });
+
+  it('"slide" paper matches the slide with no margins at 1-up', () => {
+    const p = planPage(AR, { perPage: 1, paper: 'slide' });
+    expect(p.mode).toBe('single');
+    expect(p.marginPx).toBe(0);
+    expect(p.pageWpx).toBe(960);
+    expect(p.pageHpx).toBe(540);
+    expect(p.slideScale).toBe(1);
+  });
+
+  it('"slide" paper falls back to A4 when combined with N-up', () => {
+    const p = planPage(AR, { perPage: 4, paper: 'slide' });
+    expect(p.mode).toBe('nup');
+    expect([p.pageWmm, p.pageHmm]).toEqual([297, 210]);
+  });
+
+  it('"slide" paper falls back to A4 when combined with notes', () => {
+    const p = planPage(AR, { perPage: 1, paper: 'slide', notes: ['hi'] });
+    expect(p.mode).toBe('notes');
+    expect([p.pageWmm, p.pageHmm]).toEqual([297, 210]);
+  });
 });
