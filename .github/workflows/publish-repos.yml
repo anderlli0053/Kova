@@ -262,6 +262,7 @@ jobs:
           Name=md.kova.app
           Branch=master
           Url=https://flatpak.kova.md
+          SuggestRemoteName=kova
           GPGKey=$(gpg --export "$GPG_KEY_ID" | base64 -w0)
           IsRuntime=false
           RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo
