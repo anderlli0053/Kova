@@ -29,6 +29,18 @@ export function detectOsLocale(): string {
   return SUPPORTED_CODES.has(primary) ? primary : 'en';
 }
 
+// Resolves the app's locale setting to a BCP-47 tag for Intl APIs (date/number
+// formatting), as opposed to detectOsLocale() which resolves to one of our
+// translated UI languages. This one keeps the OS's region subtag (e.g.
+// "en-GB" vs "en-US") since that's what determines date order/separators —
+// info detectOsLocale() throws away.
+export function resolveIntlLocale(locale: string): string {
+  if (locale === 'auto') {
+    return typeof navigator !== 'undefined' ? navigator.language : 'en-US';
+  }
+  return locale;
+}
+
 export function getLocaleMessages(code: string): DeepPartial<Messages> | null {
   return LOCALES.find((l) => l.code === code)?.messages ?? null;
 }

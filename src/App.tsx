@@ -29,7 +29,7 @@ import { buildMacMenu } from './macMenu';
 import type { MacMenuHandlers } from './macMenu';
 import { loadKeybindings, matchShortcut, getCombo, formatCombo, isMac } from './engine/keybindings';
 import type { Keybindings } from './engine/keybindings';
-import { I18nProvider, useLocaleTranslator } from './i18n';
+import { I18nProvider, useLocaleTranslator, formatFallbackDate } from './i18n';
 
 import { parseDocument } from './engine/parser/markdownToSlides';
 import { extractFrontmatter, patchFrontmatter } from './engine/parser/frontmatter';
@@ -467,7 +467,7 @@ export default function App() {
   // decks only ever get a title via a heading, never via frontmatter, and a
   // silently blank footer segment (issue #55) is worse than this guess.
   const docTitle = frontmatter.title ?? rawSlides.find((s) => !s.hidden && s.titleLevel === 1)?.title ?? '';
-  const docDate = (frontmatter.date as string | undefined) ?? new Date().toISOString().slice(0, 10);
+  const docDate = (frontmatter.date as string | undefined) ?? formatFallbackDate(settings.locale);
 
   const aspectRatio = useMemo(
     () => parseAspectRatio(frontmatter.aspect_ratio as string | undefined),
@@ -1195,7 +1195,7 @@ export default function App() {
   const handleExport = useCallback(async () => {
     if (visibleSlides.length === 0) return;
     try {
-      const { base64, warnings } = await exportToPptx(visibleSlides, frontmatter, activeTheme);
+      const { base64, warnings } = await exportToPptx(visibleSlides, frontmatter, activeTheme, settings.locale);
       const defaultPath = filePath
         ? filePath.replace(/\.(md|markdown)$/i, '.pptx')
         : 'presentation.pptx';

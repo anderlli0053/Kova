@@ -138,6 +138,13 @@ in **Settings → Appearance → Display language**.
    It'll then appear automatically in the Settings language dropdown — no
    other wiring needed.
 
+   **Note:** the same locale code also drives the fallback date shown when a
+   deck's frontmatter has no `date:`. It's picked up automatically via
+   [`Intl.DateTimeFormat`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat),
+   so there's nothing to translate or configure for it. This means date
+   ordering (e.g. day/month/year vs. month/day/year) works from the moment
+   you register the locale, even before you've translated a single string.
+
 7. **Open a PR.** Mention in the description which sections (if any) you left
    in English, so a reviewer can spot-check they still read sensibly.
 

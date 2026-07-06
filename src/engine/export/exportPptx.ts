@@ -11,6 +11,7 @@ import hljs from 'highlight.js';
 import type { Slide, SlideElement, Frontmatter } from '../types';
 import type { Theme } from '../theme';
 import { resolveTemplate } from '../theme';
+import { formatFallbackDate } from '../../i18n';
 
 mermaid.initialize({ startOnLoad: false, theme: 'base', securityLevel: 'antiscript' });
 
@@ -140,6 +141,7 @@ export async function exportToPptx(
   slides: Slide[],
   frontmatter: Frontmatter,
   theme: Theme,
+  locale: string,
 ): Promise<ExportResult> {
   const pres = new PptxGenJS();
   const is4x3 = (frontmatter.aspect_ratio as string | undefined) === '4:3';
@@ -152,7 +154,7 @@ export async function exportToPptx(
   // explicit `title:` — mirrors the same fallback used for the live preview
   // (see docTitle in App.tsx), so exported footers/headers match what's shown.
   const docTitle = frontmatter.title ?? slides.find((s) => s.titleLevel === 1)?.title ?? '';
-  const docDate  = frontmatter.date != null ? String(frontmatter.date) : new Date().toISOString().slice(0, 10);
+  const docDate  = frontmatter.date != null ? String(frontmatter.date) : formatFallbackDate(locale);
   const warnings: string[] = [];
 
   // Pre-resolve theme logo once (fetch → data URL, measure AR) so it can be
