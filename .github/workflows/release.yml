@@ -34,7 +34,7 @@ jobs:
           ### Bug fixes
           - **Fixed the "rescaled to fit" badge still showing on the audience/projector window** during a live presentation, and brought PowerPoint (.pptx) exports of a Table of Contents in line with the live preview — a long ToC now splits across two columns in the exported file too, with numbering continuing into the second column instead of restarting at 1 (reported by @a1880, #127).
           - **Fixed math formulas being squeezed into a narrow side-by-side column** when paired with a callout, paragraph, list, or ToC — they now stack full-width instead (reported by @codingThome, #135).
-          - **Fixed Ctrl+V paste (and the right-click Paste menu item) not working on Linux/WebKitGTK** — clipboard text is now read natively via GTK instead of the webview's clipboard APIs, which WebKitGTK blocks regardless of user interaction.
+          - **Fixed Ctrl+V paste (and the right-click Paste menu item) not working on Linux/WebKitGTK** — clipboard text is now read natively via GTK instead of the webview's clipboard APIs, which WebKitGTK blocks regardless of user interaction (reported by @JustinKenpisi, #13).
           - **Fixed a render crash leaving the presentation window stuck fullscreen with no way to close it** — the app now recovers gracefully instead of hanging (reported by @codingThome, #134).
 
           ### Packaging
