@@ -193,6 +193,7 @@ const en = {
     openInBrowserTitle: 'Open in browser: {{url}}',
     rescaledToFit: 'rescaled to fit',
     noTitledSlidesFound: 'No titled slides found',
+    pollQrUnavailable: 'QR code unavailable (link too long)',
   },
   modals: {
     importPptxTitle: 'Import from PowerPoint',

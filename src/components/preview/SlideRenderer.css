@@ -476,6 +476,7 @@
 .sl-poll { display: flex; flex-direction: column; align-items: center; gap: 3%; padding: 4%; background: color-mix(in srgb, var(--sl-accent) 10%, var(--sl-bg)); border: 2px solid var(--sl-accent); border-radius: 8px; width: 75%; }
 .sl-poll__icon { font-size: clamp(20px, 5cqi, 44px); }
 .sl-poll__qr { padding: clamp(6px, 1.2cqi, 12px); background: #fff; border-radius: 6px; display: flex; }
+.sl-poll__qr-error { width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: clamp(8px, 1.6cqi, 12px); color: #666; padding: 8px; box-sizing: border-box; }
 .sl-poll__label { font-family: var(--sl-font-title); font-size: clamp(10px, 2.5cqi, 22px); font-weight: 700; text-align: center; color: var(--sl-text); }
 .sl-poll__url { font-size: clamp(8px, 1.8cqi, 14px); color: var(--sl-accent); text-align: center; }
 
