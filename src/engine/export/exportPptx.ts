@@ -772,6 +772,23 @@ function autoSplitElements(elements: SlideElement[]): [SlideElement[], SlideElem
       [{ ...list, items: list.items.slice(mid) }],
     ];
   }
+  // Mirrors the live preview's split (SlideRenderer.tsx autoSplitElements): balance
+  // by cumulative title length and carry the numbering offset into the second column.
+  if (elements.length === 1 && elements[0].type === 'toc') {
+    const toc = elements[0];
+    const entries = toc.entries;
+    const totalLen = entries.reduce((n, en) => n + en.title.length, 0);
+    let cumLen = 0;
+    let mid = Math.ceil(entries.length / 2);
+    for (let i = 0; i < entries.length; i++) {
+      cumLen += entries[i].title.length;
+      if (cumLen >= totalLen / 2) { mid = i + 1; break; }
+    }
+    return [
+      [{ ...toc, entries: entries.slice(0, mid) }],
+      [{ ...toc, entries: entries.slice(mid), numberStart: mid }],
+    ];
+  }
   const mid = Math.ceil(elements.length / 2);
   return [elements.slice(0, mid), elements.slice(mid)];
 }
@@ -1116,14 +1133,16 @@ function addElements(s: PS, elements: SlideElement[], t: Theme, area: Area, warn
         }
         break;
 
-      case 'toc':
-        for (const entry of el.entries) {
+      case 'toc': {
+        const numberStart = el.numberStart ?? 0;
+        el.entries.forEach((entry, i) => {
           runs.push({
             text: entry.title,
-            options: { bullet: { type: 'number', style: 'arabicPeriod' } as const, fontSize: 18, paraSpaceAfter: 4, breakLine: true },
+            options: { bullet: { type: 'number', numberType: 'arabicPeriod', numberStartAt: numberStart + i + 1 }, fontSize: 18, paraSpaceAfter: 4, breakLine: true },
           });
-        }
+        });
         break;
+      }
 
       case 'code':
         // Code mixed with other elements: fall back to plain monospaced text.
