@@ -95,6 +95,7 @@ pub fn run() {
             commands::download_and_cache_font,
             commands::set_wake_lock,
             commands::read_clipboard_image,
+            commands::read_clipboard_text,
             commands::fetch_url_b64,
             commands::fetch_url_text,
             commands::confirm_exit,

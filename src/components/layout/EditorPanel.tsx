@@ -875,11 +875,22 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
       return () => el.removeEventListener('paste', handler, { capture: true });
     }
 
-    // Linux / Windows: keydown interception.
-    const handler = (e: KeyboardEvent) => {
-      if (!((e.ctrlKey || e.metaKey) && e.key === 'v')) return;
+    // Linux / Windows: intercept the native 'paste' event (fires for both
+    // Ctrl+V and Ctrl+Shift+V) rather than keydown. This lets us read text
+    // synchronously off e.clipboardData instead of via the async
+    // navigator.clipboard.readText(), which is unreliable under WebKitGTK
+    // (Ubuntu) — it can reject silently, and by the time it resolves the
+    // preceding preventDefault() has already discarded the native paste, so
+    // the keystroke does nothing. Image bytes still require the async native
+    // read below since WebKitGTK doesn't expose them through clipboardData.
+    const handler = (e: ClipboardEvent) => {
+      // Capture cursor position and text synchronously — both the document
+      // state and the clipboard event data can become unavailable once we
+      // go async.
+      const view = viewRef.current;
+      const selection = view?.state.selection.main;
+      const text = e.clipboardData?.getData('text/plain') ?? '';
 
-      // Prevent the browser paste event so we control the full paste flow.
       e.preventDefault();
 
       void (async () => {
@@ -951,35 +962,24 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
           return;
         }
 
-        // No image — fall back to plain-text paste.
-        const view = viewRef.current;
-        if (!view) return;
-        try {
-          // Capture cursor position before the async clipboard read. The
-          // document state can change during the await (especially on Windows
-          // with large clipboard content), making a post-await position read
-          // stale; CodeMirror silently rejects dispatches with invalid ranges.
-          const { from, to } = view.state.selection.main;
-          const text = await navigator.clipboard.readText();
-          if (!text) return;
-          // CodeMirror normalises \r\n → \n internally, so the inserted length
-          // may be shorter than text.length. Use the normalised form to compute
-          // the correct cursor position; otherwise the dispatch is silently
-          // rejected when the cursor would land past the end of the new document.
-          const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-          view.dispatch({
-            changes: { from, to, insert: normalised },
-            selection: EditorSelection.cursor(from + normalised.length),
-          });
-          view.focus();
-        } catch {
-          // Clipboard read failed; nothing to paste.
-        }
+        // No image — fall back to the plain text captured synchronously
+        // from the paste event.
+        if (!view || !selection || !text) return;
+        // CodeMirror normalises \r\n → \n internally, so the inserted length
+        // may be shorter than text.length. Use the normalised form to compute
+        // the correct cursor position; otherwise the dispatch is silently
+        // rejected when the cursor would land past the end of the new document.
+        const normalised = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        view.dispatch({
+          changes: { from: selection.from, to: selection.to, insert: normalised },
+          selection: EditorSelection.cursor(selection.from + normalised.length),
+        });
+        view.focus();
       })();
     };
 
-    el.addEventListener('keydown', handler, { capture: true });
-    return () => el.removeEventListener('keydown', handler, { capture: true });
+    el.addEventListener('paste', handler, { capture: true });
+    return () => el.removeEventListener('paste', handler, { capture: true });
   }, []);
 
   // Ctrl+scroll to zoom editor font size
@@ -1107,14 +1107,27 @@ export const EditorPanel = forwardRef<EditorHandle, Props>(function EditorPanel(
   async function doPaste() {
     const view = viewRef.current;
     if (!view) return;
-    const text = await navigator.clipboard.readText();
-    if (!text) return;
-    const { from, to } = view.state.selection.main;
-    view.dispatch({
-      changes: { from, to, insert: text },
-      selection: EditorSelection.cursor(from + text.length),
-    });
+    // Linux: read the GTK clipboard natively. WebKitGTK rejects both
+    // navigator.clipboard.readText() (throws NotAllowedError) and scripted
+    // document.execCommand('paste') (silently no-ops) regardless of
+    // user-gesture context, so a script-triggered paste needs to bypass the
+    // webview's clipboard APIs entirely.
+    try {
+      const text = await invoke<string>('read_clipboard_text');
+      const { from, to } = view.state.selection.main;
+      view.dispatch({
+        changes: { from, to, insert: text },
+        selection: EditorSelection.cursor(from + text.length),
+      });
+      view.focus();
+      return;
+    } catch {
+      // Not Linux, or clipboard has no text.
+    }
+    // mac / Windows: this triggers a real native 'paste' DOM event, handled
+    // by the listener registered above.
     view.focus();
+    document.execCommand('paste');
   }
 
   function doInsert(snippet: string, cursorOffset: number) {
