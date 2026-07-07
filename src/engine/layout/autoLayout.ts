@@ -151,10 +151,15 @@ export function detectLayout(
   const allPureText = bodyElements.every((e) => e.type === 'paragraph' || e.type === 'list' || e.type === 'blockquote' || e.type === 'toc');
   // Tables need a full-width area; bsp panes are too narrow for them.
   const hasTable = bodyElements.some((e) => e.type === 'table');
+  // A formula paired only with text-like content (e.g. a callout) reads
+  // better stacked than squeezed into a narrow bsp pane; math alongside
+  // non-text elements (image/code/table/etc.) is left to the normal rules.
+  const isTextLike = (t: string) => t === 'paragraph' || t === 'list' || t === 'blockquote' || t === 'toc';
+  const mathWithTextOnly = bodyElements.some((e) => e.type === 'math') && bodyElements.every((e) => e.type === 'math' || isTextLike(e.type));
 
   const logicalCount = logicalElementCount(bodyElements);
 
-  if (!allPureText && !hasTable && (logicalCount === 2 || logicalCount === 3)) return 'bsp';
+  if (!allPureText && !hasTable && !mathWithTextOnly && (logicalCount === 2 || logicalCount === 3)) return 'bsp';
 
   // ── Grid: 4+ visually diverse elements ───────────────────────────────────
   // Pure-text slides with many paragraphs look better stacked or two-column,
