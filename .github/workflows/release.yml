@@ -29,19 +29,16 @@ jobs:
           ## What's new
 
           ### New features
-          - **Callout / admonition blocks** — Obsidian/GitHub-style `[!note]`, `[!warning]`, etc. blocks for calling out important content, extendable via CSS (requested by @codingThome, #120).
-          - **Self-hosted Flatpak packaging** — signed, GPG-verified Flatpak release published to `flatpak.kova.md` alongside the existing deb/rpm repos (by @vadika, #123; addresses #9).
-          - **Release binary attestation** — published macOS/Windows/Linux binaries are now attested to the commit and build that produced them; see the new `SECURITY.md` for how to verify a download and how to report a vulnerability (by @vadika, #124; addresses #121, reported by @a1880).
-          - **German translation** — Kova is now available in German (contributed by @a1880).
-          - **Locale-aware fallback date** — the `{date}` shown when a deck has no `date:` frontmatter now follows the field order (day/month/year vs. month/day/year) of the app's selected display language instead of always showing ISO `YYYY-MM-DD` (addresses #55, reported by @a1880).
+          - **PDF export: "Match slide size" page option** — a new page-size choice for native PDF export that matches the slide's own aspect ratio exactly, instead of scaling it down inside an A4/Letter page with margins on every side (addresses #129).
 
           ### Bug fixes
-          - **Fixed Table of Contents numbering restarting at 1** in the second column of a split ToC, misaligned numbers on wrapped entries, and the "rescaled to fit" badge incorrectly showing during a live presentation (reported by @a1880, #127).
-          - **Finished translating the native macOS menu bar** (File/Edit/Present/View) and fixed the in-window toolbar and menus always showing English regardless of the selected display language.
-          - **Fixed several Slovenian translation gaps** introduced by the v0.6.12 i18n migration — missing plural forms for counts of 2–4, a zero-count ("Est. 0 min") falling back to the wrong grammatical form, and the audience/secondary-monitor window ignoring the chosen display language.
-          - **Fixed the presenter/audience date and title going out of sync** and PPTX exports leaving `{date}` blank when a deck had no frontmatter date.
-          - **Fixed slide-jump keystrokes being dropped intermittently** during dual/mirror presentation mode.
-          - **Fixed text/chart slides being vertically centered** instead of top-aligned like other layouts.
+          - **Fixed the "rescaled to fit" badge still showing on the audience/projector window** during a live presentation, and brought PowerPoint (.pptx) exports of a Table of Contents in line with the live preview — a long ToC now splits across two columns in the exported file too, with numbering continuing into the second column instead of restarting at 1 (reported by @a1880, #127).
+          - **Fixed math formulas being squeezed into a narrow side-by-side column** when paired with a callout, paragraph, list, or ToC — they now stack full-width instead (addresses #135).
+          - **Fixed Ctrl+V paste (and the right-click Paste menu item) not working on Linux/WebKitGTK** — clipboard text is now read natively via GTK instead of the webview's clipboard APIs, which WebKitGTK blocks regardless of user interaction.
+          - **Fixed a render crash leaving the presentation window stuck fullscreen with no way to close it** — the app now recovers gracefully instead of hanging (addresses #134).
+
+          ### Packaging
+          - Fixed the self-hosted Flatpak publish pipeline: corrected the Flathub runtime repo URL, made the GPG key import more reliable, and gave the installed app a friendlier remote name instead of the generic `app-origin`.
 
           ---
 
